@@ -1,0 +1,23 @@
+[
+  {
+    "type": "text",
+    "label": "**Zen Tab Archive**",
+    "size": "16px"
+  },
+  {
+    "type": "string",
+    "label": "Archive tabs idle longer than this many hours",
+    "property": "uc.zen-tab-archive.threshold-hours"
+  },
+  {
+    "type": "string",
+    "label": "Re-scan every this many minutes",
+    "property": "uc.zen-tab-archive.interval-minutes",
+    "restart": true
+  },
+  {
+    "type": "checkbox",
+    "label": "Never archive a tab that's currently playing audio",
+    "property": "uc.zen-tab-archive.skip-audible"
+  }
+]

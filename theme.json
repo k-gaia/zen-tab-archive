@@ -1,0 +1,17 @@
+{
+  "id": "zen-tab-archive",
+  "name": "Zen Tab Archive",
+  "description": "Arc-style automatic tab archiver. Idle tabs are moved out of the tab strip into a recoverable store instead of hard-closed, restorable to their original workspace with full history/scroll/form-data intact.",
+  "version": "0.1.0",
+  "homepage": "",
+  "updatedAt": "2026-09-25T00:00:00Z",
+  "no-updates": true,
+  "enabled": true,
+  "preferences": "preferences.json",
+  "scripts": {
+    "src/archiveStore.sys.mjs": {},
+    "src/archiver.sys.mjs": {},
+    "src/archiveView.uc.js": {},
+    "src/archiveSidebar.uc.js": {}
+  }
+}
