@@ -417,7 +417,7 @@
   // reads as seamless. Note this sets opacity via inline style, which
   // overrides the row's normal CSS-driven ghost/hover opacity while it's
   // near an edge -- acceptable since you're not hovering a row mid-scroll.
-  const FADE_ZONE = 40; // px from the edge where the fade starts ramping up
+  const FADE_ZONE = 56; // px from the edge where the fade starts ramping up -- bigger gap
   function updateEdgeBlur(list) {
     const listRect = list.getBoundingClientRect();
     for (const row of list.querySelectorAll(".zag-row")) {
@@ -425,10 +425,15 @@
       const distFromTop = r.top - listRect.top;
       const distFromBottom = listRect.bottom - r.bottom;
       const closest = Math.min(distFromTop, distFromBottom);
-      const amount = closest < FADE_ZONE ? Math.max(0, (FADE_ZONE - closest) / FADE_ZONE) : 0;
+      const raw = closest < FADE_ZONE ? Math.max(0, (FADE_ZONE - closest) / FADE_ZONE) : 0;
+      // Eased rather than linear -- a linear ramp still shows a faint sliver
+      // right at the true edge (amount only reaches ~1 exactly at
+      // distance=0). Squaring makes it reach fully-faded well BEFORE the
+      // true edge, so nothing is left visibly poking out.
+      const amount = raw ** 0.6;
       if (amount > 0) {
-        row.style.filter = `blur(${(amount * 3).toFixed(2)}px)`;
-        row.style.opacity = String(Math.max(0, 1 - amount));
+        row.style.filter = `blur(${(amount * 4).toFixed(2)}px)`;
+        row.style.opacity = String(Math.max(0, 1 - amount * 1.3));
       } else {
         row.style.filter = "";
         row.style.opacity = "";
