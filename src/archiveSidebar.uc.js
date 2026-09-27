@@ -218,7 +218,18 @@
     icon.src = "chrome://browser/skin/zen-icons/history.svg";
     const label = document.createElementNS(HTML_NS, "div");
     label.className = "zag-title";
-    header.append(icon, label);
+
+    // Reuses the same hover-reveal overlay pattern as row actions (.zag-actions
+    // is already styled to float over .zag-title rather than push it, since
+    // the header also carries class="zag-row").
+    const actions = document.createElementNS(HTML_NS, "div");
+    actions.className = "zag-actions";
+    const clearBtn = document.createElementNS(HTML_NS, "button");
+    clearBtn.textContent = "🗑";
+    clearBtn.className = "zag-clear-all";
+    actions.appendChild(clearBtn);
+
+    header.append(icon, label, actions);
 
     // A real XUL arrowscrollbox -- the exact element Zen's own tab list uses
     // for scrolling -- instead of a plain overflow:auto div. Gives native
@@ -270,6 +281,16 @@
     header.onclick = () => {
       if (expandedWorkspaces.has(wsId)) expandedWorkspaces.delete(wsId);
       else expandedWorkspaces.add(wsId);
+      renderSection(workspaceEl, wsId);
+    };
+
+    const clearBtn = header.querySelector(".zag-clear-all");
+    clearBtn.title = `Permanently discard all ${records.length} archived tabs in this workspace`;
+    clearBtn.onclick = async (e) => {
+      e.stopPropagation();
+      if (!confirm(`Permanently forget all ${records.length} archived tabs in this workspace? This can't be undone.`)) return;
+      clearBtn.disabled = true;
+      await Promise.all(records.map((r) => archiver.forget(r.id)));
       renderSection(workspaceEl, wsId);
     };
 

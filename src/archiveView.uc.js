@@ -113,6 +113,22 @@
     }
     .zav-group-header:hover { opacity: 0.9; background: color-mix(in srgb, AccentColor 8%, transparent); }
     .zav-group-chevron { display: inline-block; width: 10px; text-align: center; }
+    .zav-clear-all {
+      opacity: 0;
+      transition: opacity 0.1s;
+      font: inherit;
+      font-size: 10px;
+      text-transform: none;
+      letter-spacing: normal;
+      padding: 2px 6px;
+      border-radius: var(--zav-radius);
+      border: 1px solid ThreeDShadow;
+      background: ButtonFace;
+      color: ButtonText;
+      cursor: pointer;
+    }
+    .zav-group-header:hover .zav-clear-all { opacity: 1; }
+    .zav-clear-all:hover { background: color-mix(in srgb, AccentColor 25%, ButtonFace); }
     .zav-row {
       display: flex;
       align-items: center;
@@ -267,7 +283,21 @@
       chevron.textContent = isExpanded ? "▾" : "▸";
       const label = document.createElementNS(HTML_NS, "span");
       label.textContent = `${wsNames.get(wsId) ?? wsId} (${rows.length})`;
-      header.append(chevron, label);
+      label.style.flex = "1 1 auto";
+
+      const clearBtn = document.createElementNS(HTML_NS, "button");
+      clearBtn.className = "zav-clear-all";
+      clearBtn.textContent = "Forget all";
+      clearBtn.title = `Permanently discard all ${rows.length} archived tabs in this workspace`;
+      clearBtn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        if (!confirm(`Permanently forget all ${rows.length} archived tabs in "${wsNames.get(wsId) ?? wsId}"? This can't be undone.`)) return;
+        clearBtn.disabled = true;
+        await Promise.all(rows.map((r) => archiver.forget(r.id)));
+        render(panel, panel.querySelector(".zav-search input")?.value ?? "");
+      });
+
+      header.append(chevron, label, clearBtn);
       header.addEventListener("click", () => {
         if (expandedGroups.has(wsId)) expandedGroups.delete(wsId);
         else expandedGroups.add(wsId);
