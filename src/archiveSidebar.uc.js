@@ -238,7 +238,15 @@
        strip. Plain overlay divs (not mask-image on the arrowscrollbox host
        itself) because that didn't visibly affect arrowscrollbox's native
        scrolled content when tried directly on it. */
-    .zag-list-wrap { position: relative; overflow: hidden; border-radius: 14px; }
+    /* contain: paint, not just overflow: hidden -- overflow:hidden clips
+       normal CONTENT, but backdrop-filter's blur paints outside its own
+       element's box by design (a blur is a convolution that spreads pixels
+       beyond the exact edge). getBoundingClientRect() only measures the
+       layout box, so it can never show this kind of paint bleed -- that's
+       why the geometry all matching didn't actually disprove what the
+       screenshot showed. contain: paint is the explicit CSS containment
+       that clips painted output (filters included), not just content. */
+    .zag-list-wrap { position: relative; overflow: hidden; contain: paint; border-radius: 14px; }
     /* Reverted the gradient-scrim experiment -- rated worse than blur alone,
        which was rated a real improvement the moment it first worked.
        Back to blur-only; the scrim idea is parked, not worth guessing at
