@@ -110,6 +110,12 @@
       font-size: 13px;
       background: var(--panel-background-color, var(--zen-colors-primary, Canvas));
       color: var(--zen-colors-primary-foreground, CanvasText);
+      /* Rounds to match the outer <panel>'s own native corner radius
+         instead of being a flat rectangle bleeding out from inside a
+         rounded frame -- the panel itself is already rounded (inherited
+         from Zen's --panel-border-radius), this is our own inner content. */
+      border-radius: var(--panel-border-radius, var(--zav-radius));
+      overflow: hidden;
     }
     .zav-search {
       flex: 0 0 auto;
@@ -219,11 +225,16 @@
       transition: background 0.1s, filter 0.1s, scale 0.1s;
     }
     .zav-actions button:active { scale: 0.94; }
+    /* Tonal treatment (soft tint background + accent-colored text) instead
+       of a solid full-saturation fill -- a solid fill happens to clash when
+       the button's hue is close to the workspace's own accent hue (e.g. a
+       green button on a green-themed workspace read as harsh), a soft tint
+       reads as integrated across any workspace color instead of just some. */
     .zav-actions .zav-restore {
-      background: var(--zen-accent-button-background, AccentColor);
-      color: white;
+      background: color-mix(in srgb, var(--zen-accent-button-background, AccentColor) 20%, var(--zen-colors-secondary, ButtonFace));
+      color: var(--zen-accent-button-color, var(--zen-accent-button-background, AccentColor));
     }
-    .zav-actions .zav-restore:hover { filter: brightness(1.12); }
+    .zav-actions .zav-restore:hover { background: color-mix(in srgb, var(--zen-accent-button-background, AccentColor) 32%, var(--zen-colors-secondary, ButtonFace)); }
     .zav-actions .zav-forget { background: var(--zen-colors-secondary, ButtonFace); }
     .zav-actions .zav-forget:hover { background: color-mix(in srgb, #ff5f57 22%, var(--zen-colors-secondary, ButtonFace)); }
     .zav-empty { padding: 32px 10px; text-align: center; opacity: 0.5; font-size: 12.5px; }

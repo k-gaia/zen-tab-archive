@@ -159,6 +159,24 @@
     .zag-actions button:hover { background: var(--zen-colors-hover-bg, color-mix(in srgb, AccentColor 25%, ButtonFace)); }
     .zag-actions button:active { scale: 0.9; }
     .zag-clear-all:hover { background: color-mix(in srgb, #ff5f57 25%, var(--zen-colors-hover-bg, ButtonFace)) !important; }
+    /* CSS mask instead of the emoji character this used to be -- an emoji
+       glyph renders as its own fixed-color bitmap icon (a little trash can
+       with its own baked-in tan/cream colors) that ignores button color/
+       background entirely, which is exactly the "doesn't inherit Zen's
+       theming" look. Masking a plain background with the SVG's silhouette
+       makes the "icon" literally just currentColor, so it tints correctly
+       in any theme the same way a real monochrome icon would. */
+    .zag-clear-all {
+      -moz-mask-image: url("chrome://browser/skin/zen-icons/trash.svg");
+      mask-image: url("chrome://browser/skin/zen-icons/trash.svg");
+      -moz-mask-repeat: no-repeat;
+      mask-repeat: no-repeat;
+      -moz-mask-position: center;
+      mask-position: center;
+      -moz-mask-size: 14px;
+      mask-size: 14px;
+      background-color: currentColor;
+    }
     /* Blur at the top/bottom edges of the visible window instead of a hard
        clip line, so rows scrolling in/out via the arrowscrollbox's arrow
        buttons ease in rather than appearing/disappearing abruptly.
@@ -177,23 +195,28 @@
        strip. Plain overlay divs (not mask-image on the arrowscrollbox host
        itself) because that didn't visibly affect arrowscrollbox's native
        scrolled content when tried directly on it. */
-    .zag-list-wrap { position: relative; }
+    .zag-list-wrap { position: relative; overflow: hidden; border-radius: 14px; }
     .zag-fade-top, .zag-fade-bottom {
       position: absolute;
       left: 0;
       right: 0;
-      height: 16px;
+      height: 24px;
       pointer-events: none;
       z-index: 1;
-      backdrop-filter: blur(3px);
+      backdrop-filter: blur(6px) saturate(1.15);
     }
+    /* Mask stays fully opaque across most of the band, only tapering right
+       at the inner edge -- at blur(3px) with a full-height linear taper the
+       effect was too subtle to read as "blurred" (previous attempt); this
+       keeps the blur strength close to uniform across the band and only
+       fades ITS OWN edge, rather than fading the blur intensity itself. */
     .zag-fade-top {
       top: 0;
-      mask-image: linear-gradient(to bottom, black, transparent);
+      mask-image: linear-gradient(to bottom, black 65%, transparent);
     }
     .zag-fade-bottom {
       bottom: 0;
-      mask-image: linear-gradient(to top, black, transparent);
+      mask-image: linear-gradient(to top, black 65%, transparent);
     }
   `;
 
@@ -234,8 +257,7 @@
     const actions = document.createElementNS(HTML_NS, "div");
     actions.className = "zag-actions";
     const clearBtn = document.createElementNS(HTML_NS, "button");
-    clearBtn.textContent = "🗑";
-    clearBtn.className = "zag-clear-all";
+    clearBtn.className = "zag-clear-all"; // icon is a CSS mask, not text -- see CSS
     actions.appendChild(clearBtn);
 
     header.append(icon, label, actions);
