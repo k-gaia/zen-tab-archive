@@ -201,3 +201,26 @@ export async function restore(id) {
 
 export const list = store.listTabs;
 export const forget = store.removeTab; // permanently discard, no restore
+
+// Self-starting now that this loads as a real installed mod, instead of
+// requiring a manual zenArchiver.start() console call (that was a
+// deliberate dev-time safety gate, since it actually closes tabs -- not
+// appropriate for a background module that should just work once installed).
+//
+// Sine loads background modules (.sys.mjs) before per-window scripts, and
+// possibly before any browser window exists yet at all -- calling start()
+// immediately could hit getWin()'s "no browser window found" throw. Start
+// right away if a window already exists (e.g. mod installed/reloaded while
+// windows are open); otherwise wait for the first one to finish starting up.
+try {
+  getWin();
+  start();
+} catch {
+  const obs = {
+    observe() {
+      Services.obs.removeObserver(obs, "browser-delayed-startup-finished");
+      start();
+    },
+  };
+  Services.obs.addObserver(obs, "browser-delayed-startup-finished");
+}
