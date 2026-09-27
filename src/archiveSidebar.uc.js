@@ -116,7 +116,22 @@
       transform: scale(0.85);
       pointer-events: none;
     }
-    .zag-favicon { width: 16px; height: 16px; flex: 0 0 auto; margin-right: 10px; border-radius: 4px; background: var(--zen-colors-border, ThreeDShadow); }
+    /* Desaturated/dimmed to match the ghosted row text, rather than sitting
+       at full saturation while everything around it is deliberately faded
+       -- a colorful favicon still visually "pops" even under the row's own
+       opacity, since color intensity and opacity aren't the same axis.
+       Wakes up to full color on hover, same as the text. */
+    .zag-favicon {
+      width: 16px;
+      height: 16px;
+      flex: 0 0 auto;
+      margin-right: 10px;
+      border-radius: 4px;
+      background: var(--zen-colors-border, ThreeDShadow);
+      filter: grayscale(0.45) brightness(0.9);
+      transition: filter 0.15s;
+    }
+    .zag-row:hover .zag-favicon { filter: none; }
     .zag-title { flex: 1 1 auto; min-width: 0; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     /* Actions float on top of the title instead of reserving flex space --
        a normal flex sibling would shrink the title (and visibly shift the
@@ -158,25 +173,21 @@
     }
     .zag-actions button:hover { background: var(--zen-colors-hover-bg, color-mix(in srgb, AccentColor 25%, ButtonFace)); }
     .zag-actions button:active { scale: 0.9; }
-    .zag-clear-all:hover { background: color-mix(in srgb, #ff5f57 25%, var(--zen-colors-hover-bg, ButtonFace)) !important; }
-    /* CSS mask instead of the emoji character this used to be -- an emoji
-       glyph renders as its own fixed-color bitmap icon (a little trash can
-       with its own baked-in tan/cream colors) that ignores button color/
-       background entirely, which is exactly the "doesn't inherit Zen's
-       theming" look. Masking a plain background with the SVG's silhouette
-       makes the "icon" literally just currentColor, so it tints correctly
-       in any theme the same way a real monochrome icon would. */
+    /* Text pill instead of an icon -- the emoji character it started as
+       ignored theming entirely (its own baked-in colors), and the CSS-mask
+       SVG icon that replaced it rendered too thin/low-contrast to read at
+       this size. Text is reliably legible regardless of glyph rendering,
+       and matches the popup's "Forget all" pill for consistency between
+       both surfaces. */
     .zag-clear-all {
-      -moz-mask-image: url("chrome://browser/skin/zen-icons/trash.svg");
-      mask-image: url("chrome://browser/skin/zen-icons/trash.svg");
-      -moz-mask-repeat: no-repeat;
-      mask-repeat: no-repeat;
-      -moz-mask-position: center;
-      mask-position: center;
-      -moz-mask-size: 14px;
-      mask-size: 14px;
-      background-color: currentColor;
+      width: auto;
+      height: auto;
+      padding: 3px 8px;
+      font-size: 10.5px;
+      font-weight: 500;
+      white-space: nowrap;
     }
+    .zag-clear-all:hover { background: color-mix(in srgb, #ff5f57 25%, var(--zen-colors-hover-bg, ButtonFace)) !important; }
     /* Blur at the top/bottom edges of the visible window instead of a hard
        clip line, so rows scrolling in/out via the arrowscrollbox's arrow
        buttons ease in rather than appearing/disappearing abruptly.
@@ -196,27 +207,33 @@
        itself) because that didn't visibly affect arrowscrollbox's native
        scrolled content when tried directly on it. */
     .zag-list-wrap { position: relative; overflow: hidden; border-radius: 14px; }
+    /* backdrop-filter alone still wasn't visibly strong enough even at
+       blur(6px) -- suspect it isn't reliably sampling the arrowscrollbox's
+       scrolled content, since that's native widget content, not plain
+       CSS-clipped DOM the way a browser normally composites backdrop-filter
+       against. Layering a light-dark()-aware gradient scrim UNDER the blur
+       gives a real visible fade regardless of whether the blur sampling
+       itself is working against that native content -- it doesn't need to
+       know the exact background color, just whether we're in light or dark
+       mode, which light-dark() already handles via color-scheme. */
     .zag-fade-top, .zag-fade-bottom {
       position: absolute;
       left: 0;
       right: 0;
-      height: 24px;
+      height: 26px;
       pointer-events: none;
       z-index: 1;
       backdrop-filter: blur(6px) saturate(1.15);
     }
-    /* Mask stays fully opaque across most of the band, only tapering right
-       at the inner edge -- at blur(3px) with a full-height linear taper the
-       effect was too subtle to read as "blurred" (previous attempt); this
-       keeps the blur strength close to uniform across the band and only
-       fades ITS OWN edge, rather than fading the blur intensity itself. */
     .zag-fade-top {
       top: 0;
-      mask-image: linear-gradient(to bottom, black 65%, transparent);
+      background: linear-gradient(to bottom, light-dark(rgba(255, 255, 255, 0.45), rgba(0, 0, 0, 0.45)), transparent);
+      mask-image: linear-gradient(to bottom, black 70%, transparent);
     }
     .zag-fade-bottom {
       bottom: 0;
-      mask-image: linear-gradient(to top, black 65%, transparent);
+      background: linear-gradient(to top, light-dark(rgba(255, 255, 255, 0.45), rgba(0, 0, 0, 0.45)), transparent);
+      mask-image: linear-gradient(to top, black 70%, transparent);
     }
   `;
 
@@ -257,7 +274,8 @@
     const actions = document.createElementNS(HTML_NS, "div");
     actions.className = "zag-actions";
     const clearBtn = document.createElementNS(HTML_NS, "button");
-    clearBtn.className = "zag-clear-all"; // icon is a CSS mask, not text -- see CSS
+    clearBtn.className = "zag-clear-all";
+    clearBtn.textContent = "Clear all";
     actions.appendChild(clearBtn);
 
     header.append(icon, label, actions);

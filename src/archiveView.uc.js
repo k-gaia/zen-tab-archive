@@ -190,7 +190,18 @@
       cursor: default;
     }
     .zav-row:hover { background: var(--zen-colors-hover-bg, color-mix(in srgb, AccentColor 12%, transparent)); }
-    .zav-favicon { width: 16px; height: 16px; flex: 0 0 auto; border-radius: 4px; background: var(--zen-colors-border, ThreeDShadow); }
+    /* Desaturated to match neighboring text rather than sitting at full
+       saturation while nothing else is -- same reasoning as the sidebar. */
+    .zav-favicon {
+      width: 16px;
+      height: 16px;
+      flex: 0 0 auto;
+      border-radius: 4px;
+      background: var(--zen-colors-border, ThreeDShadow);
+      filter: grayscale(0.45) brightness(0.9);
+      transition: filter 0.15s;
+    }
+    .zav-row:hover .zav-favicon { filter: none; }
     .zav-meta { flex: 1 1 auto; min-width: 0; }
     .zav-title { font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .zav-sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 11px; opacity: 0.55; }
