@@ -220,55 +220,18 @@
       background-color: var(--zen-colors-primary-foreground, white);
     }
     .zag-actions .zag-clear-all:hover { background-color: #ff5f57; }
-    /* Blur at the top/bottom edges of the visible window instead of a hard
-       clip line, so rows scrolling in/out via the arrowscrollbox's arrow
-       buttons ease in rather than appearing/disappearing abruptly.
-       backdrop-filter rather than a color-gradient overlay -- tried that
-       first, but the workspace's actual visible background turned out to be
-       painted by something other than background-color (computed
-       backgroundColor came back fully transparent, rgba(0,0,0,0), even
-       though the sidebar clearly isn't -- consistent with Zen's gradient
-       theme system painting it via a pseudo-element or separate layer), so a
-       "fade to the workspace's color" gradient had no real color to fade to.
-       backdrop-filter blurs whatever is actually behind it regardless of how
-       it's painted, so it doesn't need to know the color at all -- and it's
-       also just the effect that was actually asked for. The mask-image
-       tapers the blur itself from full at the edge to none toward the
-       middle, so it reads as a soft blur rather than a hard-edged blurred
-       strip. Plain overlay divs (not mask-image on the arrowscrollbox host
-       itself) because that didn't visibly affect arrowscrollbox's native
-       scrolled content when tried directly on it. */
-    /* contain: paint, not just overflow: hidden -- overflow:hidden clips
-       normal CONTENT, but backdrop-filter's blur paints outside its own
-       element's box by design (a blur is a convolution that spreads pixels
-       beyond the exact edge). getBoundingClientRect() only measures the
-       layout box, so it can never show this kind of paint bleed -- that's
-       why the geometry all matching didn't actually disprove what the
-       screenshot showed. contain: paint is the explicit CSS containment
-       that clips painted output (filters included), not just content. */
-    .zag-list-wrap { position: relative; overflow: hidden; contain: paint; border-radius: 14px; }
-    /* Reverted the gradient-scrim experiment -- rated worse than blur alone,
-       which was rated a real improvement the moment it first worked.
-       Back to blur-only; the scrim idea is parked, not worth guessing at
-       again without actually inspecting why backdrop-filter behaves the way
-       it does against this native widget first. */
-    .zag-fade-top, .zag-fade-bottom {
-      position: absolute;
-      left: 0;
-      right: 0;
-      height: 24px;
-      pointer-events: none;
-      z-index: 1;
-      backdrop-filter: blur(6px) saturate(1.15);
-    }
-    .zag-fade-top {
-      top: 0;
-      mask-image: linear-gradient(to bottom, black 65%, transparent);
-    }
-    .zag-fade-bottom {
-      bottom: 0;
-      mask-image: linear-gradient(to top, black 65%, transparent);
-    }
+    .zag-list-wrap { position: relative; }
+    /* Edge blur, take 3: retired the overlay-div + backdrop-filter approach
+       entirely after several rounds of it fighting the arrowscrollbox's
+       native compositing (blur too subtle, then a gradient scrim rated
+       worse, then contain: paint still couldn't stop it visually escaping
+       the sidebar and overlapping the native scroll arrows -- the overlay
+       sits in the exact same edge zone the native arrows occupy, by
+       construction, no amount of CSS containment changes that). Blurring
+       each ROW directly as it nears the edge -- via updateEdgeBlur() below,
+       driven by the arrowscrollbox's own scroll event -- sidesteps all of
+       that: it's our own row elements we fully control, not a separate
+       layer trying to sample/composite against native widget content. */
   `;
 
   function ensureStyle() {
@@ -323,14 +286,11 @@
     const list = document.createXULElement("arrowscrollbox");
     list.setAttribute("orient", "vertical");
     list.className = "zag-list";
+    list.addEventListener("scroll", () => updateEdgeBlur(list));
 
     const listWrap = document.createElementNS(HTML_NS, "div");
     listWrap.className = "zag-list-wrap";
-    const fadeTop = document.createElementNS(HTML_NS, "div");
-    fadeTop.className = "zag-fade-top";
-    const fadeBottom = document.createElementNS(HTML_NS, "div");
-    fadeBottom.className = "zag-fade-bottom";
-    listWrap.append(list, fadeTop, fadeBottom);
+    listWrap.appendChild(list);
 
     section.append(header, listWrap);
 
@@ -380,11 +340,6 @@
 
     const list = section.querySelector(".zag-list");
     list.textContent = "";
-
-    const fadeTop = section.querySelector(".zag-fade-top");
-    const fadeBottom = section.querySelector(".zag-fade-bottom");
-    const overflowing = isExpanded && records.length > VISIBLE_ROWS;
-    fadeTop.style.display = fadeBottom.style.display = overflowing ? "" : "none";
 
     if (!isExpanded) return;
 
@@ -449,6 +404,27 @@
       actions.append(restoreBtn, forgetBtn);
       row.append(icon, title, actions);
       list.appendChild(row);
+    }
+
+    updateEdgeBlur(list);
+  }
+
+  // Blurs each row directly based on how close it is to the top/bottom edge
+  // of the visible (arrowscrollbox) viewport, instead of a separate overlay
+  // layer. Driven by the list's own "scroll" event -- if arrowscrollbox
+  // doesn't fire one when scrolled via its native arrow buttons rather than
+  // the wheel, this silently does nothing on those clicks, which is the
+  // thing to check for live before tuning FADE_ZONE further.
+  const FADE_ZONE = 24; // px from the edge where blur starts ramping up
+  function updateEdgeBlur(list) {
+    const listRect = list.getBoundingClientRect();
+    for (const row of list.querySelectorAll(".zag-row")) {
+      const r = row.getBoundingClientRect();
+      const distFromTop = r.top - listRect.top;
+      const distFromBottom = listRect.bottom - r.bottom;
+      const closest = Math.min(distFromTop, distFromBottom);
+      const amount = closest < FADE_ZONE ? Math.max(0, (FADE_ZONE - closest) / FADE_ZONE) : 0;
+      row.style.filter = amount > 0 ? `blur(${(amount * 2.5).toFixed(2)}px)` : "";
     }
   }
 
