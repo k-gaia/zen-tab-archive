@@ -235,33 +235,27 @@
        itself) because that didn't visibly affect arrowscrollbox's native
        scrolled content when tried directly on it. */
     .zag-list-wrap { position: relative; overflow: hidden; border-radius: 14px; }
-    /* backdrop-filter alone still wasn't visibly strong enough even at
-       blur(6px) -- suspect it isn't reliably sampling the arrowscrollbox's
-       scrolled content, since that's native widget content, not plain
-       CSS-clipped DOM the way a browser normally composites backdrop-filter
-       against. Layering a light-dark()-aware gradient scrim UNDER the blur
-       gives a real visible fade regardless of whether the blur sampling
-       itself is working against that native content -- it doesn't need to
-       know the exact background color, just whether we're in light or dark
-       mode, which light-dark() already handles via color-scheme. */
+    /* Reverted the gradient-scrim experiment -- rated worse than blur alone,
+       which was rated a real improvement the moment it first worked.
+       Back to blur-only; the scrim idea is parked, not worth guessing at
+       again without actually inspecting why backdrop-filter behaves the way
+       it does against this native widget first. */
     .zag-fade-top, .zag-fade-bottom {
       position: absolute;
       left: 0;
       right: 0;
-      height: 26px;
+      height: 24px;
       pointer-events: none;
       z-index: 1;
       backdrop-filter: blur(6px) saturate(1.15);
     }
     .zag-fade-top {
       top: 0;
-      background: linear-gradient(to bottom, light-dark(rgba(255, 255, 255, 0.45), rgba(0, 0, 0, 0.45)), transparent);
-      mask-image: linear-gradient(to bottom, black 70%, transparent);
+      mask-image: linear-gradient(to bottom, black 65%, transparent);
     }
     .zag-fade-bottom {
       bottom: 0;
-      background: linear-gradient(to top, light-dark(rgba(255, 255, 255, 0.45), rgba(0, 0, 0, 0.45)), transparent);
-      mask-image: linear-gradient(to top, black 70%, transparent);
+      mask-image: linear-gradient(to top, black 65%, transparent);
     }
   `;
 
