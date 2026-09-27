@@ -409,13 +409,15 @@
     updateEdgeBlur(list);
   }
 
-  // Blurs each row directly based on how close it is to the top/bottom edge
-  // of the visible (arrowscrollbox) viewport, instead of a separate overlay
-  // layer. Driven by the list's own "scroll" event -- if arrowscrollbox
-  // doesn't fire one when scrolled via its native arrow buttons rather than
-  // the wheel, this silently does nothing on those clicks, which is the
-  // thing to check for live before tuning FADE_ZONE further.
-  const FADE_ZONE = 24; // px from the edge where blur starts ramping up
+  // Blurs AND fades each row directly based on how close it is to the top/
+  // bottom edge of the visible (arrowscrollbox) viewport, instead of a
+  // separate overlay layer. Confirmed live: blur alone still left a
+  // legible-ish sliver right at the cut edge -- combining with opacity so
+  // edge rows fade to fully transparent, not just blurry, is what actually
+  // reads as seamless. Note this sets opacity via inline style, which
+  // overrides the row's normal CSS-driven ghost/hover opacity while it's
+  // near an edge -- acceptable since you're not hovering a row mid-scroll.
+  const FADE_ZONE = 40; // px from the edge where the fade starts ramping up
   function updateEdgeBlur(list) {
     const listRect = list.getBoundingClientRect();
     for (const row of list.querySelectorAll(".zag-row")) {
@@ -424,7 +426,13 @@
       const distFromBottom = listRect.bottom - r.bottom;
       const closest = Math.min(distFromTop, distFromBottom);
       const amount = closest < FADE_ZONE ? Math.max(0, (FADE_ZONE - closest) / FADE_ZONE) : 0;
-      row.style.filter = amount > 0 ? `blur(${(amount * 2.5).toFixed(2)}px)` : "";
+      if (amount > 0) {
+        row.style.filter = `blur(${(amount * 3).toFixed(2)}px)`;
+        row.style.opacity = String(Math.max(0, 1 - amount));
+      } else {
+        row.style.filter = "";
+        row.style.opacity = "";
+      }
     }
   }
 
