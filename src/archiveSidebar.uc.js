@@ -204,18 +204,22 @@
        needed to be MORE visible, not replaced). Same fix as the header
        icon: explicit bright color instead of inherited currentColor (too
        dim last attempt), and a bigger mask (16px, up from 14px). */
-    .zag-clear-all {
-      -moz-mask-image: url("chrome://browser/skin/zen-icons/trash.svg");
+    /* .zag-actions .zag-clear-all (two classes), not .zag-clear-all alone --
+       confirmed via probe-sidebar-overlay-issues.js: the mask itself was
+       resolving fine, but .zag-actions button's background: transparent
+       rule (one class + one type selector, specificity 0-1-1) was silently
+       beating a bare .zag-clear-all rule (0-1-0) regardless of source
+       order, making the masked icon invisible (filled with transparent).
+       Also dropped the -moz-mask-* properties: CSS.supports confirmed they
+       aren't recognized in this build, only the unprefixed ones are. */
+    .zag-actions .zag-clear-all {
       mask-image: url("chrome://browser/skin/zen-icons/trash.svg");
-      -moz-mask-repeat: no-repeat;
       mask-repeat: no-repeat;
-      -moz-mask-position: center;
       mask-position: center;
-      -moz-mask-size: 16px;
       mask-size: 16px;
       background-color: var(--zen-colors-primary-foreground, white);
     }
-    .zag-clear-all:hover { background-color: #ff5f57; }
+    .zag-actions .zag-clear-all:hover { background-color: #ff5f57; }
     /* Blur at the top/bottom edges of the visible window instead of a hard
        clip line, so rows scrolling in/out via the arrowscrollbox's arrow
        buttons ease in rather than appearing/disappearing abruptly.
