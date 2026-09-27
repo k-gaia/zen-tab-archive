@@ -70,91 +70,163 @@
     }
   }
 
+  // Time-bucket label for a workspace's row list -- Today/Yesterday/This
+  // week/This month/Older. Rows are already sorted newest-first, so buckets
+  // come out contiguous; this just labels where one bucket ends and the
+  // next begins, instead of one flat list of potentially hundreds of rows.
+  function bucketLabel(ms) {
+    const days = (Date.now() - ms) / 8.64e7;
+    if (days < 1) return "Today";
+    if (days < 2) return "Yesterday";
+    if (days < 7) return "This week";
+    if (days < 30) return "This month";
+    return "Older";
+  }
+
+  // Real Zen design tokens instead of generic system colors (Canvas/
+  // ButtonFace/AccentColor/ThreeDShadow) -- confirmed from Zen's own
+  // stylesheets (src/zen/common/styles/zen-theme.css, zen-buttons.css,
+  // zen-popup.css): --zen-colors-primary/secondary/tertiary, a dedicated
+  // --zen-colors-hover-bg and --zen-colors-input-bg, --zen-colors-border,
+  // and --zen-border-radius scaled by --zen-squircle-value (their actual
+  // corner-shape system -- Zen uses `corner-shape: superellipse()` for true
+  // squircles, not just border-radius). The panel itself already inherits
+  // Zen's native --panel-background-color/--panel-border-radius as a real
+  // <panel type="arrow">; the previous CSS was overriding all of that with
+  // generic system colors on our own inner content, which is what actually
+  // made it look like a generic dialog instead of part of Zen.
   const CSS = `
-    #${PANEL_ID} { --zav-radius: 8px; }
+    #${PANEL_ID} {
+      --zav-radius: calc(var(--zen-border-radius, 7px) * var(--zen-squircle-value, 1.3));
+      --zav-radius-sm: calc(var(--zav-radius) * 0.65);
+      --zav-corner: superellipse(var(--zen-squircle-value, 1.3));
+    }
     .zav-root {
       display: flex;
       flex-direction: column;
       width: 420px;
       max-height: 70vh;
-      font: message-box;
+      font: menu;
       font-size: 13px;
-      background: Canvas;
-      color: CanvasText;
+      background: var(--panel-background-color, var(--zen-colors-primary, Canvas));
+      color: var(--zen-colors-primary-foreground, CanvasText);
     }
     .zav-search {
       flex: 0 0 auto;
-      padding: 8px;
-      border-bottom: 1px solid ThreeDShadow;
+      padding: 10px;
+      border-bottom: 1px solid var(--zen-colors-border, ThreeDShadow);
     }
     .zav-search input {
       width: 100%;
       box-sizing: border-box;
-      padding: 6px 8px;
+      appearance: none;
+      padding: 7px 10px;
       border-radius: var(--zav-radius);
-      border: 1px solid ThreeDShadow;
-      background: Field;
-      color: FieldText;
+      corner-shape: var(--zav-corner);
+      border: 1px solid var(--zen-colors-border, ThreeDShadow);
+      background: var(--zen-colors-input-bg, Field);
+      color: inherit;
       font: inherit;
     }
-    .zav-list { flex: 1 1 auto; overflow-y: auto; padding: 4px 0; }
+    .zav-search input:focus-visible {
+      outline: 2px solid var(--zen-accent-button-color, AccentColor);
+      outline-offset: -1px;
+    }
+    .zav-list { flex: 1 1 auto; overflow-y: auto; padding: 6px; }
     .zav-group-header {
       display: flex;
       align-items: center;
-      gap: 4px;
-      padding: 6px 10px;
-      font-size: 11px;
+      gap: 6px;
+      padding: 7px 8px;
+      margin-top: 2px;
+      font-size: 12px;
+      font-weight: 600;
+      opacity: 0.7;
+      cursor: pointer;
+      border-radius: var(--zav-radius-sm);
+    }
+    .zav-group-header:hover { opacity: 1; background: var(--zen-colors-hover-bg, color-mix(in srgb, AccentColor 8%, transparent)); }
+    .zav-group-chevron { display: inline-block; width: 10px; text-align: center; }
+    .zav-time-header {
+      padding: 6px 8px 2px;
+      font-size: 10px;
       font-weight: 600;
       text-transform: uppercase;
-      letter-spacing: 0.03em;
-      opacity: 0.6;
-      cursor: pointer;
-      border-radius: var(--zav-radius);
+      letter-spacing: 0.05em;
+      opacity: 0.4;
     }
-    .zav-group-header:hover { opacity: 0.9; background: color-mix(in srgb, AccentColor 8%, transparent); }
-    .zav-group-chevron { display: inline-block; width: 10px; text-align: center; }
     .zav-clear-all {
       opacity: 0;
-      transition: opacity 0.1s;
+      transition: opacity 0.1s, background 0.1s, scale 0.1s;
+      appearance: none;
       font: inherit;
-      font-size: 10px;
-      text-transform: none;
-      letter-spacing: normal;
-      padding: 2px 6px;
-      border-radius: var(--zav-radius);
-      border: 1px solid ThreeDShadow;
-      background: ButtonFace;
-      color: ButtonText;
+      font-size: 10.5px;
+      font-weight: 500;
+      padding: 3px 8px;
+      border-radius: var(--zav-radius-sm);
+      corner-shape: var(--zav-corner);
+      border: none;
+      background: var(--zen-colors-secondary, ButtonFace);
+      color: inherit;
       cursor: pointer;
     }
     .zav-group-header:hover .zav-clear-all { opacity: 1; }
-    .zav-clear-all:hover { background: color-mix(in srgb, AccentColor 25%, ButtonFace); }
+    .zav-clear-all:hover { background: color-mix(in srgb, #ff5f57 22%, var(--zen-colors-secondary, ButtonFace)); }
+    .zav-clear-all:active { scale: 0.94; }
     .zav-row {
+      position: relative;
       display: flex;
       align-items: center;
       gap: 8px;
-      padding: 6px 10px;
-      border-radius: var(--zav-radius);
+      padding: 6px 8px;
+      border-radius: var(--zav-radius-sm);
+      corner-shape: var(--zav-corner);
       cursor: default;
     }
-    .zav-row:hover { background: color-mix(in srgb, AccentColor 12%, transparent); }
-    .zav-favicon { width: 16px; height: 16px; flex: 0 0 auto; border-radius: 3px; background: ThreeDShadow; }
+    .zav-row:hover { background: var(--zen-colors-hover-bg, color-mix(in srgb, AccentColor 12%, transparent)); }
+    .zav-favicon { width: 16px; height: 16px; flex: 0 0 auto; border-radius: 4px; background: var(--zen-colors-border, ThreeDShadow); }
     .zav-meta { flex: 1 1 auto; min-width: 0; }
-    .zav-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .zav-sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 11px; opacity: 0.6; }
-    .zav-actions { display: flex; gap: 4px; flex: 0 0 auto; }
+    .zav-title { font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .zav-sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 11px; opacity: 0.55; }
+    /* Actions float over .zav-meta on hover instead of reserving flex space
+       -- same reasoning as the sidebar's row actions: a permanent flex
+       sibling would shrink the title/subtitle even while invisible. */
+    .zav-row:hover .zav-meta {
+      mask-image: linear-gradient(to left, transparent 0, transparent 96px, black 116px);
+    }
+    .zav-actions {
+      position: absolute;
+      right: 6px;
+      top: 50%;
+      transform: translateY(-50%);
+      display: flex;
+      gap: 4px;
+      opacity: 0;
+      transition: opacity 0.1s;
+    }
+    .zav-row:hover .zav-actions { opacity: 1; }
     .zav-actions button {
+      appearance: none;
       font: inherit;
       font-size: 11px;
-      padding: 3px 8px;
-      border-radius: var(--zav-radius);
-      border: 1px solid ThreeDShadow;
-      background: ButtonFace;
-      color: ButtonText;
+      font-weight: 500;
+      padding: 4px 9px;
+      border-radius: var(--zav-radius-sm);
+      corner-shape: var(--zav-corner);
+      border: none;
+      color: inherit;
       cursor: pointer;
+      transition: background 0.1s, filter 0.1s, scale 0.1s;
     }
-    .zav-actions button:hover { background: color-mix(in srgb, AccentColor 20%, ButtonFace); }
-    .zav-empty { padding: 24px 10px; text-align: center; opacity: 0.6; }
+    .zav-actions button:active { scale: 0.94; }
+    .zav-actions .zav-restore {
+      background: var(--zen-accent-button-background, AccentColor);
+      color: white;
+    }
+    .zav-actions .zav-restore:hover { filter: brightness(1.12); }
+    .zav-actions .zav-forget { background: var(--zen-colors-secondary, ButtonFace); }
+    .zav-actions .zav-forget:hover { background: color-mix(in srgb, #ff5f57 22%, var(--zen-colors-secondary, ButtonFace)); }
+    .zav-empty { padding: 32px 10px; text-align: center; opacity: 0.5; font-size: 12.5px; }
   `;
 
   // Workspace ids the user has chosen to expand. Default is collapsed for
@@ -223,6 +295,7 @@
     };
 
     const restoreBtn = document.createElementNS(HTML_NS, "button");
+    restoreBtn.className = "zav-restore";
     restoreBtn.textContent = "Restore";
     restoreBtn.addEventListener("click", async () => {
       restoreBtn.disabled = true;
@@ -231,6 +304,7 @@
     });
 
     const forgetBtn = document.createElementNS(HTML_NS, "button");
+    forgetBtn.className = "zav-forget";
     forgetBtn.textContent = "Forget";
     forgetBtn.addEventListener("click", async () => {
       forgetBtn.disabled = true;
@@ -306,7 +380,18 @@
       list.appendChild(header);
 
       if (isExpanded) {
-        for (const record of rows) list.appendChild(makeRow(record));
+        let currentBucket = null;
+        for (const record of rows) {
+          const bucket = bucketLabel(record.archivedAt);
+          if (bucket !== currentBucket) {
+            currentBucket = bucket;
+            const timeHeader = document.createElementNS(HTML_NS, "div");
+            timeHeader.className = "zav-time-header";
+            timeHeader.textContent = bucket;
+            list.appendChild(timeHeader);
+          }
+          list.appendChild(makeRow(record));
+        }
       }
     }
   }

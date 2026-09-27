@@ -74,8 +74,13 @@
   // margin, 8px horizontal content padding, 14px label text -- so the ghost
   // rows read as "the same tabs, just faded" rather than a smaller/different
   // custom list.
+  // Same real Zen tokens as archiveView.uc.js's popup, for visual
+  // consistency between both surfaces (see that file's CSS comment for
+  // where these come from).
   const CSS = `
     .${SECTION_CLASS} {
+      --zag-radius: calc(var(--zen-border-radius, 7px) * var(--zen-squircle-value, 1.3));
+      --zag-corner: superellipse(var(--zen-squircle-value, 1.3));
       display: flex;
       flex-direction: column-reverse;
       margin-top: 2px;
@@ -100,7 +105,7 @@
       opacity: 0.55;
       transition: opacity 0.18s ease, transform 0.18s ease;
     }
-    .zag-row:hover { opacity: 1; background: color-mix(in srgb, AccentColor 15%, transparent); }
+    .zag-row:hover { opacity: 1; background: var(--zen-colors-hover-bg, color-mix(in srgb, AccentColor 15%, transparent)); }
     /* Quick shrink-and-fade before a row actually leaves the DOM on restore/
        forget, instead of vanishing instantly when the list gets torn down and
        rebuilt. Extra specificity (.zag-list .zag-row.zag-removing) so it wins
@@ -111,7 +116,7 @@
       transform: scale(0.85);
       pointer-events: none;
     }
-    .zag-favicon { width: 16px; height: 16px; flex: 0 0 auto; margin-right: 10px; border-radius: 4px; background: ThreeDShadow; }
+    .zag-favicon { width: 16px; height: 16px; flex: 0 0 auto; margin-right: 10px; border-radius: 4px; background: var(--zen-colors-border, ThreeDShadow); }
     .zag-title { flex: 1 1 auto; min-width: 0; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     /* Actions float on top of the title instead of reserving flex space --
        a normal flex sibling would shrink the title (and visibly shift the
@@ -142,14 +147,18 @@
       height: 24px;
       padding: 0;
       border: none;
-      border-radius: 8px;
+      border-radius: var(--zag-radius);
+      corner-shape: var(--zag-corner);
       background: transparent;
       color: inherit;
       font-size: 13px;
       line-height: 1;
       cursor: pointer;
+      transition: background 0.1s, scale 0.1s;
     }
-    .zag-actions button:hover { background: color-mix(in srgb, AccentColor 25%, ButtonFace); }
+    .zag-actions button:hover { background: var(--zen-colors-hover-bg, color-mix(in srgb, AccentColor 25%, ButtonFace)); }
+    .zag-actions button:active { scale: 0.9; }
+    .zag-clear-all:hover { background: color-mix(in srgb, #ff5f57 25%, var(--zen-colors-hover-bg, ButtonFace)) !important; }
     /* Blur at the top/bottom edges of the visible window instead of a hard
        clip line, so rows scrolling in/out via the arrowscrollbox's arrow
        buttons ease in rather than appearing/disappearing abruptly.
