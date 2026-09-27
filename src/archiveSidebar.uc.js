@@ -39,7 +39,11 @@
 // workspace switches automatically -- no extra visibility logic needed.
 
 (() => {
-  const archiver = ChromeUtils.importESModule("chrome://sine/content/src/archiver.sys.mjs");
+  // Sine serves each mod's files under chrome://sine/content/<mod-id>/...
+  // (matching the real disk layout: chrome/sine-mods/<mod-id>/src/...) --
+  // the mod id prefix is required, confirmed after "Failed to load
+  // chrome://sine/content/src/archiver.sys.mjs" errors from omitting it.
+  const archiver = ChromeUtils.importESModule("chrome://sine/content/zen-tab-archive/src/archiver.sys.mjs");
 
   const HTML_NS = "http://www.w3.org/1999/xhtml";
   const SECTION_CLASS = "zen-archive-ghost-section";
