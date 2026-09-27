@@ -400,9 +400,119 @@ against the copy. Archives persist in the copy's own
    turned out very doable once Zen's real DOM structure was sourced instead
    of guessed. Toast-with-undo at archive time not built yet — deferred,
    not blocking.
-6. **Package + publish** as a mod. ← **next candidate**, or more UI polish
-   first (toast-with-undo, the per-workspace right-click menu idea using
-   `#zenWorkspaceMoreActions`) — not yet decided which.
+6. ~~Package as a real Sine mod~~ — done, installed and working end-to-end
+   against the disposable test profile (see "Packaging — Sine mod" below).
+   Publishing (Discussions posts etc.) still deliberately deferred per the
+   "Deferred" section below. Next: more UI polish (toast-with-undo, the
+   per-workspace right-click menu idea using `#zenWorkspaceMoreActions`) —
+   not yet decided which, or start using the mod for real and see what
+   friction shows up.
+
+### Packaging — Sine mod
+
+The project is now a real installable [Sine](https://github.com/CosmoCreeper/Sine)
+mod, not just console-pasted dev scripts. Repo:
+https://github.com/k-gaia/zen-tab-archive (public — required, see below).
+
+**File layout changed to match Sine's real format** (confirmed from Sine's
+own source, `manager.sys.mjs`/`utils.sys.mjs`, not guessed):
+- `theme.json` (repo root) — the manifest: id/name/version/description,
+  `preferences: "preferences.json"`, and `scripts` — a flat object keyed by
+  path, e.g. `"src/archiver.sys.mjs": {}`. Leaf keys ending `.sys.mjs` are
+  **background modules**, loaded once via `ChromeUtils.importESModule`.
+  Leaf keys ending `.uc.js`/`.uc.mjs` are **window scripts**, loaded **per
+  browser window** via `Services.scriptloader.loadSubScriptWithOptions`,
+  which means they run directly in that window's own scope — `gBrowser`,
+  `document`, `gZenWorkspaces`, `setInterval` are real bare globals there,
+  no `getWin()` needed. (The `modules` field in theme.json is unrelated —
+  it's for declaring *other Sine mods* as dependencies, not your own files;
+  confirmed by reading `installMod`'s recursive call on `newThemeData.modules`.)
+- `preferences.json` (repo root) — declarative settings shown in Zen's
+  native preferences UI. Array of `{type, label, property, ...}`; `property`
+  is a real about:config pref string (convention: `uc.<mod-id>.<key>`).
+  Types confirmed from the wiki: checkbox/string/text/separator, plus
+  `size`/`border`/`margin`/`conditions`/`operator`/`restart` modifiers.
+- `src/archiveStore.mjs` → `src/archiveStore.sys.mjs`, `src/archiver.mjs` →
+  `src/archiver.sys.mjs` — renamed only, unchanged behavior, still resolve
+  a window via `getWin()` since they're background modules.
+- `src/archiveView.mjs` → `src/archiveView.uc.js`, `src/archiveSidebar.mjs`
+  → `src/archiveSidebar.uc.js` — converted from ESM (`export function`) to
+  plain scripts that attach to `window.ZenTabArchive.view` /
+  `window.ZenTabArchive.sidebar`. All `win.`/`getWin()` threading removed —
+  real bare globals now that they run in actual window scope.
+- `archiver.sys.mjs`'s knobs (threshold-hours, interval-minutes,
+  skip-pinned/essentials/active/audible) are now real about:config prefs
+  under `uc.zen-tab-archive.*`, read live via `Services.prefs.get*Pref` with
+  fallback defaults — bound to `preferences.json` entries. Re-read every
+  scan (no restart needed) except interval-minutes, which only takes effect
+  on the next `start()` — marked `restart: true`.
+- `archiver.sys.mjs` now **self-starts** on load (see bottom of the file)
+  instead of requiring a manual `start()` call — that was a dev-time safety
+  gate (it actually closes tabs), not appropriate once this is a real
+  installed mod. Handles both possible load orderings (Sine loads
+  background modules before per-window scripts, possibly before any browser
+  window exists): starts immediately if a window already exists, otherwise
+  waits for `browser-delayed-startup-finished`.
+
+**Real installation, done live** (manual method from Sine's own docs,
+`sineorg/docs/src/installation.md` — not the "automatic" installer, to
+avoid running an unknown downloaded .exe):
+1. Bootloader `program.zip` (from `sineorg/bootloader` releases) extracted
+   into `C:\Program Files\Zen Browser\` — the **shared program install**,
+   requires admin elevation (had the user run this step themselves).
+   Adds `config.js` (hooked in via `general.config.filename`/
+   `general.config.sandbox_enabled` prefs from `defaults/pref/config-prefs.js`,
+   the classic Firefox AutoConfig mechanism) + `defaults/`. By itself this
+   does nothing to any profile — inert without step 2.
+2. Bootloader `profile.zip` + Sine's own `engine.zip` (from `CosmoCreeper/Sine`
+   releases) extracted into the **test profile's own** `chrome/` folder —
+   scoped to just the disposable test profile, never the real one.
+3. `about:support` → "Clear Startup Cache" + full restart.
+4. In Sine Mods settings (a real new "Sine Mods" section appears, confirmed
+   via screenshot — a marketplace UI with an "add your own locally from a
+   GitHub repo" field), typed `k-gaia/zen-tab-archive` → Install.
+
+**Real bugs found and fixed during this** (none of these were guessable in
+advance — each needed a live repro):
+- **Private repos silently don't work.** Sine's `installMod` fetches
+  `theme.json` via `raw.githubusercontent.com`, and separately downloads
+  the whole repo as a zip via `codeload.github.com/.../zip/<branch>` — both
+  need unauthenticated public access. A private repo just 404s, and Sine's
+  error handling doesn't surface this clearly (Install button just greys
+  out with no console error) — confirmed via `curl -sI` on the raw URL
+  before/after flipping the repo to public (404 → 200). **Fix: made the
+  repo public** (contains no secrets — checked before every commit).
+- **`sine.allow-unsafe-js` gate.** Scripts from non-store mods (anything
+  installed via the "local GitHub repo" field, i.e. everything we'd ever
+  do) don't execute at all unless this about:config pref is set to `true` —
+  `utils.getScripts()` silently filters them out
+  (`mod.enabled && (allowUnsafeJS || mod.origin === "store")`). The mod
+  installs and registers in `mods.json` fine either way; only the actual JS
+  execution is gated. No error, just an empty resolved-scripts list —
+  diagnosed by importing Sine's own `utils.sys.mjs` directly in the console
+  and calling `getScripts()` ourselves (`dryrun/probe-mod-scripts.js`) to
+  see what it actually resolved.
+- **Wrong chrome:// path (our bug, not Sine's).** Hardcoded
+  `chrome://sine/content/src/archiver.sys.mjs` in both `.uc.js` files —
+  missing the mod-id path segment. Sine serves each mod's files under
+  `chrome://sine/content/<mod-id>/...`, matching the real disk layout
+  (`chrome/sine-mods/<mod-id>/src/...`). Surfaced as
+  `Error: Failed to load chrome://sine/content/src/archiver.sys.mjs` once
+  the allow-unsafe-js gate was cleared. Fixed to
+  `chrome://sine/content/zen-tab-archive/src/archiver.sys.mjs`.
+- **No in-place update in this Sine version's UI** — only "Remove mod" and
+  re-install from the same GitHub field. That's the actual dev loop for now:
+  push a fix → remove mod → re-install → (fully restart, not just a new
+  window, to be safe) → re-check.
+- **`window.manager`/`window.ZenTabArchive` don't populate on an
+  already-open window** — both are set by a "new window created" observer
+  inside Sine/our own scripts, so an already-open window never gets them
+  retroactively. Always check on a *newly opened* window or after a full
+  restart, not the window you were already in when something loaded.
+
+Confirmed fully working end-to-end after all of the above:
+`window.ZenTabArchive` → `{ view: {...}, sidebar: {...} }` on a fresh
+window, matching the real API.
 
 ### UI — built and validated live
 
