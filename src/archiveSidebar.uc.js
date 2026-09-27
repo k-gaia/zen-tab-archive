@@ -132,6 +132,32 @@
       transition: filter 0.15s;
     }
     .zag-row:hover .zag-favicon { filter: none; }
+    /* Mask + explicit bright color, not a plain <img src="...svg">. A plain
+       <img> just renders whatever color is baked into the SVG file, which
+       reads as dim/mismatched against a dark theme -- compare the real
+       toolbarbutton's icon (the master-menu toggle in the sidebar's bottom
+       toolbar), which renders bright white because XUL toolbarbutton icons
+       get -moz-context-properties/fill:currentColor treatment that a plain
+       HTML <img> never gets. Masking with an explicit light color, rather
+       than relying on inherited currentColor (which the first attempt did
+       and was still too dim), makes it match that same bright rendering. */
+    .zag-header-icon {
+      width: 16px;
+      height: 16px;
+      flex: 0 0 auto;
+      margin-right: 10px;
+      -moz-mask-image: url("chrome://browser/skin/zen-icons/history.svg");
+      mask-image: url("chrome://browser/skin/zen-icons/history.svg");
+      -moz-mask-repeat: no-repeat;
+      mask-repeat: no-repeat;
+      -moz-mask-position: center;
+      mask-position: center;
+      -moz-mask-size: 16px;
+      mask-size: 16px;
+      background-color: var(--zen-colors-primary-foreground, white);
+      opacity: 0.85;
+    }
+    .zag-row:hover .zag-header-icon { opacity: 1; }
     .zag-title { flex: 1 1 auto; min-width: 0; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     /* Actions float on top of the title instead of reserving flex space --
        a normal flex sibling would shrink the title (and visibly shift the
@@ -173,21 +199,23 @@
     }
     .zag-actions button:hover { background: var(--zen-colors-hover-bg, color-mix(in srgb, AccentColor 25%, ButtonFace)); }
     .zag-actions button:active { scale: 0.9; }
-    /* Text pill instead of an icon -- the emoji character it started as
-       ignored theming entirely (its own baked-in colors), and the CSS-mask
-       SVG icon that replaced it rendered too thin/low-contrast to read at
-       this size. Text is reliably legible regardless of glyph rendering,
-       and matches the popup's "Forget all" pill for consistency between
-       both surfaces. */
+    /* Back to an icon (the emoji glyph was the actual problem -- its own
+       baked-in colors ignore theming entirely; this was liked, it just
+       needed to be MORE visible, not replaced). Same fix as the header
+       icon: explicit bright color instead of inherited currentColor (too
+       dim last attempt), and a bigger mask (16px, up from 14px). */
     .zag-clear-all {
-      width: auto;
-      height: auto;
-      padding: 3px 8px;
-      font-size: 10.5px;
-      font-weight: 500;
-      white-space: nowrap;
+      -moz-mask-image: url("chrome://browser/skin/zen-icons/trash.svg");
+      mask-image: url("chrome://browser/skin/zen-icons/trash.svg");
+      -moz-mask-repeat: no-repeat;
+      mask-repeat: no-repeat;
+      -moz-mask-position: center;
+      mask-position: center;
+      -moz-mask-size: 16px;
+      mask-size: 16px;
+      background-color: var(--zen-colors-primary-foreground, white);
     }
-    .zag-clear-all:hover { background: color-mix(in srgb, #ff5f57 25%, var(--zen-colors-hover-bg, ButtonFace)) !important; }
+    .zag-clear-all:hover { background-color: #ff5f57; }
     /* Blur at the top/bottom edges of the visible window instead of a hard
        clip line, so rows scrolling in/out via the arrowscrollbox's arrow
        buttons ease in rather than appearing/disappearing abruptly.
@@ -262,9 +290,11 @@
     // a plain divider label -- icon + text, no separate chevron.
     const header = document.createElementNS(HTML_NS, "div");
     header.className = "zag-header zag-row";
-    const icon = document.createElementNS(HTML_NS, "img");
-    icon.className = "zag-favicon";
-    icon.src = "chrome://browser/skin/zen-icons/history.svg";
+    // A fixed static icon (mask + currentColor), NOT .zag-favicon -- that
+    // class is for real per-tab favicon images, which must render their own
+    // actual colors (just desaturated via filter), not be masked.
+    const icon = document.createElementNS(HTML_NS, "div");
+    icon.className = "zag-header-icon";
     const label = document.createElementNS(HTML_NS, "div");
     label.className = "zag-title";
 
@@ -275,7 +305,6 @@
     actions.className = "zag-actions";
     const clearBtn = document.createElementNS(HTML_NS, "button");
     clearBtn.className = "zag-clear-all";
-    clearBtn.textContent = "Clear all";
     actions.appendChild(clearBtn);
 
     header.append(icon, label, actions);
