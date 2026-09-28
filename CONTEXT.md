@@ -403,10 +403,25 @@ against the copy. Archives persist in the copy's own
 6. ~~Package as a real Sine mod~~ — done, installed and working end-to-end
    against the disposable test profile (see "Packaging — Sine mod" below).
    Publishing (Discussions posts etc.) still deliberately deferred per the
-   "Deferred" section below. Next: more UI polish (toast-with-undo, the
-   per-workspace right-click menu idea using `#zenWorkspaceMoreActions`) —
-   not yet decided which, or start using the mod for real and see what
-   friction shows up.
+   "Deferred" section below.
+7. ~~UI polish pass #2~~ — done, driven by live screenshot feedback against
+   the installed Sine mod (not the console-loader dev loop). Real Zen design
+   tokens throughout (`--zen-colors-*`, `--zen-border-radius`/
+   `--zen-squircle-value`, `corner-shape: superellipse()`) instead of
+   generic system colors; hover-reveal row actions with an overlay+mask-fade
+   pattern (popup and sidebar both); time-bucket grouping
+   (Today/Yesterday/This week/This month/Older) in the popup; per-workspace
+   "forget all" bulk action in both views; desaturated favicons that wake to
+   full color on hover; a real fixed-icon treatment (CSS mask +
+   `background-color: currentColor`, not a plain `<img src="...svg">`,
+   which doesn't get the automatic tinting XUL toolbarbutton icons get) for
+   the header icon and clear-all button; and — after three failed
+   approaches — a working per-row edge blur/fade in the sidebar (see
+   "Sidebar edge blur" below for the full story, it's a good one).
+8. **CI: tiered compatibility checks against new Zen releases** — ← **next
+   candidate** (currently in design discussion, not built). See
+   "CI design notes" below. Not urgent, mod isn't published yet, but worth
+   having a plan before it is.
 
 ### Packaging — Sine mod
 
@@ -596,18 +611,163 @@ Key findings from building it:
   the box by a fixed safety margin (reduced but didn't eliminate it). Not
   investigated further — revisit if it's ever actually annoying rather than
   cosmetic.
-- **The scroll-edge blur** (the actual ask, not a color fade — an earlier
-  attempt used a background-color gradient, which was invisible because
-  `getComputedStyle(workspaceEl).backgroundColor` is fully transparent; the
-  real visible gradient background is painted by something else, consistent
-  with Zen's own `ZenGradientGenerator.mjs` theme system) uses plain HTML
-  overlay divs with `backdrop-filter: blur()` + a `mask-image` taper,
-  layered on top of the arrowscrollbox — works regardless of how the
-  background underneath is actually painted, since backdrop-filter blurs
-  whatever's there rather than needing to match a specific color.
+- **The scroll-edge blur/fade** went through four real iterations before
+  landing on a working approach — see "Sidebar edge blur — the full story"
+  below. The overlay-div + `backdrop-filter` approach described in earlier
+  versions of this doc is **retired**; current approach blurs+fades each
+  row directly, driven by scroll position.
 - **Restore/forget play a quick shrink-and-fade transition** before the row
   actually leaves the DOM (`.zag-removing` class + a `180ms` delay before
   the real store mutation + list rebuild), instead of vanishing instantly.
+
+### UI polish pass #2 — real Zen tokens, driven by live screenshots
+
+Done after the mod was actually installed via Sine — this round was
+diagnosed and fixed against the real running mod (edit → sync file directly
+into `chrome/sine-mods/zen-tab-archive/src/` → new window to hot-reload
+`.uc.js` changes), not the old console-loader dev loop, which no longer
+applies once Sine owns loading.
+
+- **Real Zen design tokens**, sourced from Zen's own stylesheets
+  (`src/zen/common/styles/zen-theme.css`, `zen-buttons.css`,
+  `zen-popup.css` in the `zen-browser/desktop` repo — not guessed):
+  `--zen-colors-primary/secondary/tertiary`, `--zen-colors-hover-bg`,
+  `--zen-colors-input-bg`, `--zen-colors-border`, `--zen-border-radius`
+  scaled by `--zen-squircle-value` (their real corner-shape system — they
+  use `corner-shape: superellipse()` for true squircles, which we adopted
+  too), and an oklch-derived `--zen-accent-button-color`/
+  `-background`. The popup's own `<panel type="arrow">` already inherited
+  Zen's native `--panel-background-color`/`--panel-border-radius` for
+  free; the old CSS was overriding all of it with generic system colors
+  (`Canvas`/`ButtonFace`/`AccentColor`/`ThreeDShadow`) on our own inner
+  content, which is what made it look like a dialog dropped on top of Zen
+  rather than part of it.
+- **Hover-reveal row actions** in both views now (popup used to always show
+  Restore/Forget) — actions float over the title via `position: absolute`
+  + a `mask-image` fade on the title, same overlay-not-push pattern proven
+  in the sidebar earlier, applied to the popup too.
+- **Time-bucket grouping** (Today/Yesterday/This week/This month/Older)
+  within each workspace group in the popup — a flat newest-first list of a
+  few hundred rows was hard to scan.
+- **Per-workspace "forget all"** in both views, gated behind a native
+  `confirm()` since it's irreversible and can wipe hundreds at once.
+- **Desaturated favicons** (`filter: grayscale(0.45) brightness(0.9)`,
+  full color on hover) — a colorful favicon still visually "pops" even
+  under the row's own ghost opacity, since color saturation and opacity
+  aren't the same visual axis. Applied to both views.
+- **Real icon-button treatment, the hard way.** First attempt used an
+  emoji (🗑) for the sidebar's clear-all button — emoji glyphs render as
+  their own fixed-color bitmap icon that ignores `color`/`background`
+  entirely, which read as "broken theming" but was really just the wrong
+  technique. Second attempt swapped to a CSS-masked `trash.svg` +
+  `background-color: currentColor` — the *right* idea (this is genuinely
+  how you make an SVG icon tint like a native one, since a plain
+  `<img src="...svg">` just renders whatever color is baked into the file
+  and never gets the `currentColor` treatment a XUL toolbarbutton's
+  `image` attribute gets automatically), but it came out invisible.
+  Diagnosed live (`dryrun/probe-clear-all-icon.js`,
+  `probe-sidebar-overlay-issues.js`): `computed backgroundColor` was
+  `rgba(0,0,0,0)` despite being set explicitly, because `.zag-actions
+  button { background: transparent }` (class + type selector, specificity
+  0-1-1) was silently beating a bare `.zag-clear-all` rule (0-1-0),
+  regardless of source order — the mask itself had been resolving
+  correctly the whole time. Fixed by scoping to `.zag-actions
+  .zag-clear-all` (0-2-0). Same mask technique fixed the sidebar header's
+  `history.svg` icon too, which had the identical root cause (plain
+  `<img>`, not currentColor-tinted) — new `.zag-header-icon` class, kept
+  separate from `.zag-favicon` (real per-tab favicon images, which must
+  render their own actual colors, never masked).
+- **Popup's Restore button**: tonal treatment (soft accent-tinted
+  background + accent-colored text) instead of a solid full-saturation
+  fill — a solid fill clashed when the button's own hue was close to the
+  workspace's own accent hue (a green button read as harsh on a
+  green-themed workspace); a soft tint reads as integrated across any
+  workspace color instead of just some.
+
+### Sidebar edge blur — the full story
+
+Four real iterations, worth recording in full since each one taught
+something and the failure modes weren't guessable in advance:
+
+1. **Overlay divs + `backdrop-filter: blur()` on top of the
+   arrowscrollbox.** Worked, barely — rated "can see the blur for the
+   first time" as a real improvement once the CSS specificity/positioning
+   was sorted, but stayed too subtle even at `blur(6px)`.
+2. **Added a `light-dark()`-aware gradient scrim under the blur**, to give
+   a guaranteed-visible fade regardless of whether the blur was really
+   sampling the native widget's content correctly. Rated **worse** than
+   blur alone — reverted immediately rather than keep tuning a change that
+   made things worse.
+3. **`contain: paint` on the wrapping div**, after live feedback ("the
+   screenshot literally shows the blur escaping the sidebar's edge") that
+   directly contradicted a `getBoundingClientRect()`-based claim that
+   nothing could be overflowing. That contradiction was the useful part:
+   `getBoundingClientRect()` measures an element's **layout box**, but
+   `backdrop-filter`'s blur **paints outside that box by design** (a blur
+   is a convolution that spreads pixels beyond the exact edge) — matching
+   rects never actually disproved visible paint bleed, it just wasn't the
+   right thing to measure. `contain: paint` is the explicit CSS
+   containment for *painted* output, not just content (`overflow: hidden`
+   alone doesn't reliably clip filter effects). Didn't fully fix it: the
+   overlay still spatially overlapped the arrowscrollbox's native up/down
+   arrow buttons, by construction (both occupy the same top:0/bottom:0
+   edge zone of the same box) — no amount of containment changes that.
+4. **Retired the overlay approach entirely.** Blurs+fades each `.zag-row`
+   directly instead, via `updateEdgeBlur()` driven by the arrowscrollbox's
+   own `scroll` event — computes each row's distance from the visible
+   list's top/bottom edge and applies `filter: blur()` + inline `opacity`
+   proportional to that distance. Since it's our own row elements, not a
+   separate layer trying to sample/composite against native widget
+   content, it sidesteps the entire class of problem the first three
+   attempts kept hitting. Confirmed live that `scroll` events do fire for
+   arrowscrollbox's native arrow-button clicks, not just the wheel.
+   Tuned twice more from there: linear ramping left a faint sliver right
+   at the true edge (opacity/blur amount only hit their max exactly at
+   distance 0), fixed with an eased curve (`raw ** 0.6`, plus an extra 1.3×
+   multiplier on the opacity falloff specifically) so both reach "fully
+   faded" well before the true edge instead of exactly at it; `FADE_ZONE`
+   widened 24px → 40px → 56px for a bigger, more gradual transition.
+
+### CI design notes (discussion stage, not built)
+
+Concern raised: this mod hard-depends on Zen's undocumented internals
+(`#zen-sidebar-foot-buttons`, `<zen-workspace>` child structure,
+`gZenWorkspaces._allStoredTabs`/`_workspaceCache`, specific `--zen-*` CSS
+custom properties, `chrome://browser/skin/zen-icons/*.svg` paths) that can
+change without notice on any Zen release, and Sine pulls `theme.json` live
+from `main` on every install/update — so there's no obvious way to stop a
+user on an older Zen from getting a build that assumes newer internals.
+
+Direction settled on so far: not a traditional test suite, but a
+**tiered-severity canary CI job** —
+1. **Critical/smoke tier** — does the mod load at all: `window.ZenTabArchive`
+   populates, archiver self-starts, the DOM anchors we hard-depend on
+   exist. Failure = dead for every user on that Zen version.
+2. **Feature-regression tier** — narrower checks that specific things still
+   work: restore actually restores content, forget actually removes from
+   the store, sidebar renders correctly grouped. Failure = partial
+   breakage.
+3. **Cosmetic-drift tier** — do the specific `--zen-*` variables and icon
+   paths we reference still exist. Failure = probably still works, might
+   look wrong.
+
+Mechanism: separate GitHub Actions **jobs** per tier (so job-level status
+in GitHub's own UI already communicates severity at a glance) inside a
+workflow triggered on a schedule and/or Zen release tags, running headless
+Zen + Marionette. Note this reuses Marionette automation, which was
+deliberately avoided earlier in this project for the archiver's *own*
+idle-timing logic (risks skewing the real `lastAccessed`/`pending` signal)
+— that objection doesn't apply here, since these checks are structural
+("did Zen rename something we depend on"), not measuring real idle
+behavior. On failure, auto-file (or update) a GitHub Issue labeled by
+tier (`severity:critical`/`severity:minor`) rather than leaving a red X in
+Actions that's easy to miss — a triageable backlog instead of scrollback.
+
+Open question, not yet researched: whether Sine's `theme.json` format
+supports declaring a compatible-Zen-version range or pinning at all — if
+not, there's no clean way to gate a broken build from reaching users
+regardless of how good the CI signal is, which matters for how much this
+is worth building before the mod is actually published.
 
 ### Deferred (do NOT do yet)
 - **Post on Zen Discussions #5414** (and maybe #2326) flagging the mod as built
