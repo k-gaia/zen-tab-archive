@@ -1,2 +1,4 @@
 .out-of-code-insights/
 scratch.js
+ci/node_modules/
+ci-results/

@@ -1,0 +1,80 @@
+name: Zen compatibility canary
+
+# Tiered canary: runs the mod against the latest Zen release (or a chosen
+# tag) and reports by severity. Tier failures are triaged by label:
+#   critical -> mod is dead on that Zen version
+#   feature  -> a specific feature is broken (severity:major)
+#   cosmetic -> something may look wrong (severity:minor)
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+    inputs:
+      zen_tag:
+        description: "Zen release tag to test (blank = latest)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+  issues: write
+
+env:
+  SINE_BOOTLOADER_TAG: v0.1.4
+  SINE_ENGINE_TAG: v2.3.3
+  MOZ_REMOTE_ALLOW_SYSTEM_ACCESS: "1"
+  GH_TOKEN: ${{ github.token }}
+
+jobs:
+  tier:
+    strategy:
+      fail-fast: false
+      matrix:
+        tier: [critical, feature, cosmetic]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install CI dependencies
+        working-directory: ci
+        run: npm install
+
+      - name: Download Zen, Sine bootloader and engine
+        env:
+          ZEN_TAG_INPUT: ${{ inputs.zen_tag }}
+        run: bash ci/setup.sh
+
+      - name: Prepare test profile with the mod installed
+        run: node ci/prepare.mjs
+
+      - name: Run ${{ matrix.tier }} checks
+        run: node ci/run-tier.mjs ${{ matrix.tier }}
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: results-${{ matrix.tier }}
+          path: ci-results/${{ matrix.tier }}.json
+          if-no-files-found: warn
+
+  report:
+    needs: tier
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: results-*
+          path: ci-results-downloaded
+          merge-multiple: true
+
+      - name: File or update severity issues for failing tiers
+        run: bash ci/report.sh ci-results-downloaded
