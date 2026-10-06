@@ -418,10 +418,12 @@ against the copy. Archives persist in the copy's own
    the header icon and clear-all button; and — after three failed
    approaches — a working per-row edge blur/fade in the sidebar (see
    "Sidebar edge blur" below for the full story, it's a good one).
-8. **CI: tiered compatibility checks against new Zen releases** — ← **next
-   candidate** (currently in design discussion, not built). See
-   "CI design notes" below. Not urgent, mod isn't published yet, but worth
-   having a plan before it is.
+8. **CI: tiered compatibility checks against new Zen releases** — scaffold
+   built and pushed (`.github/workflows/zen-compat.yml`, `ci/`), **not yet
+   run**. Triggered weekly and via Actions → "Zen compatibility canary" →
+   Run workflow. Unverified: the driver layer (geckodriver driving a headless
+   Zen binary in chrome context) is the riskiest piece and will need
+   iteration on the first real run. See "CI design notes" below.
 
 ### Packaging — Sine mod
 
