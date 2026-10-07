@@ -874,22 +874,55 @@ working live**, icon included, after several real dead ends:
   (`document.l10n`) — real bare globals in window scope, no
   `ChromeUtils.importESModule` needed, so none of this risks the same
   `document is not defined` failure the lit import did.
-- **The icon** uses the exact same `[data-section="..."] 
+- **The icon** went through several rounds of guessing before the real fix.
+  First attempt reused the plain `chrome://browser/skin/zen-icons/history.svg`
+  (same icon as the sidebar button/section) via the `[data-section="..."]
   .zen-library-tab-icon-image { background-image: url(...) }` selector
-  convention as Zen's own sections (confirmed from `zen-library.css`) —
-  reuses `history.svg`, the same icon as the sidebar button/section, for
-  consistency across all three surfaces (popup, sidebar, Library).
+  convention Zen's own sections use — looked reasonable on paper but hit
+  three real, separate bugs live: (1) the base rule sizes the icon element
+  to *36 frames wide* unconditionally (confirmed via probe: 1008px computed
+  width against a 20px height), since Zen's own library icons are animated
+  36-frame sprites and rely on a wrapper's `overflow: clip` to crop back to
+  one frame — our single-frame image was stretched illegibly thin across
+  that whole box; (2) Zen's inactive-state rule zeroes `fill`, relying on a
+  separate stroke-only path to stay visible as an outline — `history.svg`
+  is fill-only with no stroke path, so it went fully invisible when
+  unselected; chasing this with hand-tuned `fill`/`opacity` overrides never
+  looked right, because `--fill` itself resolves to a muted, fairly dark
+  tone (confirmed via probe) — not the bright color the other icons'
+  outlines actually use; (3) the `[animate]` sprite-step animation
+  (`translateX` across 35 frame-widths, confirmed in the real keyframes)
+  dragged our one frame off-screen and snapped it back on selection, since
+  it assumes a sprite that isn't there.
+  **Real fix**: stopped guessing and pulled Zen's actual source
+  (`library-history-sprite.svg` from zen-browser/desktop) — confirmed its
+  icons use a genuine two-channel construction, every shape drawn twice,
+  once `fill="context-fill"` and once `stroke="context-stroke"
+  stroke-width="7.1"`, which is *why* Zen's native CSS can hide fill while
+  keeping stroke visible for the inactive state. `src/icons/archived-tabs.svg`
+  (a small archive-box glyph, authored for this project) follows the same
+  two-channel construction as a single static frame instead of a sprite, so
+  Zen's own rules just work with zero color overrides — only `width` (one
+  frame, not 36) and disabling the sprite-step `[animate]` animation remain,
+  since those are genuinely about frame count, not color. (One more real
+  bug on the way there: the SVG's first draft had a license-style comment
+  using `--` as an em dash, which XML forbids inside comments — silently
+  failed the whole file's parse, making the icon vanish in *both* states
+  until caught.)
 
-Net: this genuinely did hit the "too much resistance" threshold at least
-twice (the lit crash, then the Fluent registration dead end where
-searchfox/GitHub search access ran out) — pushed through both because
-each time there was a concrete, real next thing to check (what does
-`ZenLibrary.mjs` actually require for `render()`; what does Mozilla's own
-test-writing documentation show for the real constructor), not just
-more guessing. Worth remembering as a pattern for next time something
-like this comes up: the difference between "stuck" and "one more real
-lead to check" is usually whether there's still a primary source left to
-read.
+Net: this genuinely did hit the "too much resistance" threshold several
+times over (the lit crash, the Fluent registration dead end where
+searchfox/GitHub search access ran out, then three separate icon bugs) —
+pushed through every time because there was a concrete, real next thing to
+check (what does `ZenLibrary.mjs` actually require for `render()`; what
+does Mozilla's own test-writing documentation show for the real
+constructor; what does Zen's actual sprite SVG look like under the hood),
+not just more guessing. Worth remembering as a pattern for next time
+something like this comes up: the difference between "stuck" and "one more
+real lead to check" is usually whether there's still a primary source left
+to read — and when CSS-side hacking starts compounding without landing,
+that's the signal to go find the primary source instead of tuning another
+knob.
 
 ### Deferred (do NOT do yet)
 - **Post on Zen Discussions #5414** (and maybe #2326) flagging the mod as built
