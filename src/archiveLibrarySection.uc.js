@@ -35,15 +35,33 @@
 //
 // Section.label is a Fluent l10n id (confirmed: Zen's own sections use ids
 // like "library-history-section-title", resolved via data-l10n-id in
-// <zen-library>'s own template) -- not plain text. We ship our own .ftl and
-// register it with document.l10n.addResourceIds(), the real Fluent
-// mechanism for this.
+// <zen-library>'s own template) -- not plain text.
+//
+// First attempt called document.l10n.addResourceIds() with the .ftl file's
+// full absolute chrome:// path, which produced "Missing resource in locale
+// en-US/en-GB" warnings -- addResourceIds() treats its argument as a
+// resource id to resolve against REGISTERED locale sources, not an
+// arbitrary absolute URL; passing the full path meant it tried (and failed)
+// to find a source covering an id that looks like that, for every
+// negotiated locale. The real mechanism (confirmed from dom/webidl/
+// Localization.webidl's doc comments and Mozilla's own L10nFileSource.
+// createMock() test-writing docs) is to register an actual L10nFileSource
+// -- name, a metasource category, the locales it covers, and a prePath
+// URL TEMPLATE containing a {locale} placeholder -- then add the resource
+// by its RELATIVE filename, which gets resolved against that template.
+// L10nRegistry/L10nFileSource are WebIDL [Exposed=Window] interfaces, same
+// as Localization itself (document.l10n), so they're real bare globals in
+// our window-scoped script -- no ChromeUtils.importESModule needed, so
+// this doesn't risk the same "document is not defined" class of failure
+// lit.all.mjs hit.
 
 (() => {
   const archiver = ChromeUtils.importESModule("chrome://sine/content/zen-tab-archive/src/archiver.sys.mjs");
 
   const HTML_NS = "http://www.w3.org/1999/xhtml";
-  const FTL_PATH = "chrome://sine/content/zen-tab-archive/src/locale/zen-tab-archive.ftl";
+  const FTL_SOURCE_NAME = "zen-tab-archive";
+  const FTL_PRE_PATH = "chrome://sine/content/zen-tab-archive/src/locale/{locale}/";
+  const FTL_RESOURCE_ID = "zen-tab-archive.ftl";
   const SECTION_ID = "archived-tabs";
   const STYLE_ID = "zen-archive-library-style";
 
@@ -342,9 +360,28 @@
     }
   }
 
+  function registerFluentSource() {
+    try {
+      const registry = L10nRegistry.getInstance();
+      const source = new L10nFileSource(FTL_SOURCE_NAME, "app", ["en-US"], FTL_PRE_PATH);
+      // Re-registering the same name on every reload would throw -- update
+      // in place if it's already there (same stale-reload lesson as
+      // everywhere else in this project).
+      if (registry.hasSource(FTL_SOURCE_NAME)) {
+        registry.updateSources([source]);
+      } else {
+        registry.registerSources([source]);
+      }
+      document.l10n?.addResourceIds([FTL_RESOURCE_ID]);
+      console.log("[zen-tab-archive/library] Fluent source registered OK");
+    } catch (err) {
+      console.log("[zen-tab-archive/library] Fluent registration FAILED:", err.message, err);
+    }
+  }
+
   function install() {
     ensureStyle();
-    document.l10n?.addResourceIds([FTL_PATH]);
+    registerFluentSource();
 
     const tryInstall = () => {
       const lib = document.querySelector("zen-library");
