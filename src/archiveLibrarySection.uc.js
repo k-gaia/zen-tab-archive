@@ -94,23 +94,14 @@
       font: menu;
       font-size: 13px;
     }
-    .zal-search {
-      flex: 0 0 auto;
-      padding: 10px;
-      border-bottom: 1px solid var(--zen-colors-border, ThreeDShadow);
-    }
-    .zal-search input {
-      width: 100%;
-      box-sizing: border-box;
-      appearance: none;
-      padding: 7px 10px;
-      border-radius: var(--zal-radius);
-      corner-shape: var(--zal-corner);
-      border: 1px solid var(--zen-colors-border, ThreeDShadow);
-      background: var(--zen-colors-input-bg, Field);
-      color: inherit;
-      font: inherit;
-    }
+    /* Search box + filter button/panel dropped in favour of reusing Zen's
+       own real markup and classes (.zen-library-search-top/-header/-box/
+       -filter-*, confirmed from ZenLibrarySearchSection.mjs, the shared
+       base all of Zen's own sections render through) -- those are styled
+       globally by zen-library.css, not scoped to any particular
+       data-section, so we get the real pill search box, filter chip
+       panel, and open/close height animation for free instead of
+       hand-rolling CSS for them. */
     .zal-list { flex: 1 1 auto; overflow-y: auto; padding: 8px; }
     .zal-group-header {
       display: flex;
@@ -246,6 +237,13 @@
   // re-renders the same way the popup's expandedGroups does.
   const expandedGroups = new Set();
 
+  // "When archived" filter, same semantics/day-thresholds as Zen's own
+  // History section (WHEN_DAYS in ZenLibrarySearchSection.mjs: today=1,
+  // week=7, month=30) -- null means no filter active. Module-scope, same
+  // persistence pattern as expandedGroups.
+  const WHEN_DAYS = { today: 1, week: 7, month: 30 };
+  let activeWhen = null;
+
   function makeRow(record, rerender) {
     const row = document.createElementNS(HTML_NS, "div");
     row.className = "zal-row";
@@ -296,9 +294,11 @@
 
     const records = await archiver.list();
     const q = filterValue.trim().toLowerCase();
-    const filtered = q
+    const textFiltered = q
       ? records.filter((r) => (r.title || "").toLowerCase().includes(q) || r.url.toLowerCase().includes(q))
       : records;
+    const cutoff = activeWhen ? Date.now() - WHEN_DAYS[activeWhen] * 86400000 : null;
+    const filtered = cutoff ? textFiltered.filter((r) => r.archivedAt >= cutoff) : textFiltered;
 
     if (filtered.length === 0) {
       const empty = document.createElementNS(HTML_NS, "div");
@@ -320,7 +320,7 @@
     }
     for (const rows of groups.values()) rows.sort((a, b) => b.archivedAt - a.archivedAt);
 
-    const rerender = () => renderInto(root, root.querySelector(".zal-search input")?.value ?? "");
+    const rerender = () => renderInto(root, root.querySelector(".zen-library-search-box input")?.value ?? "");
 
     for (const [wsId, rows] of groups) {
       const isExpanded = expandedGroups.has(wsId);
@@ -359,23 +359,106 @@
     }
   }
 
+  // Builds a Zen library icon <img>, same convention used throughout
+  // zen-library.css (-moz-context-properties recoloring applies to these
+  // automatically since they're Zen's own chrome://browser/skin icons).
+  function libraryIcon(path) {
+    const img = document.createElementNS(HTML_NS, "img");
+    img.src = `chrome://browser/skin/zen-icons/${path}`;
+    img.alt = "";
+    return img;
+  }
+
+  // Reuses Zen's own real search/filter markup and classes (confirmed
+  // from ZenLibrarySearchSection.mjs, the shared base all of Zen's own
+  // library sections render through) instead of a custom search box, so
+  // it gets Zen's real pill styling, filter-chip panel, and open/close
+  // height animation for free. library-filter-button/-done/-today/-week/
+  // -month are Zen's OWN existing Fluent ids (already registered app-wide
+  // since History/Downloads/etc use them) -- only the section title, the
+  // search placeholder, and the filter panel's own title are ours.
   function buildSectionNode() {
     const root = document.createElementNS(HTML_NS, "div");
     root.className = "zen-library-section zal-root";
     root.dataset.section = SECTION_ID;
 
-    const searchWrap = document.createElementNS(HTML_NS, "div");
-    searchWrap.className = "zal-search";
+    const searchTop = document.createElementNS(HTML_NS, "div");
+    searchTop.className = "zen-library-search-top";
+
+    const searchHeader = document.createElementNS(HTML_NS, "div");
+    searchHeader.className = "zen-library-search-header";
+
+    const searchBox = document.createElementNS(HTML_NS, "div");
+    searchBox.className = "zen-library-search-box";
     const input = document.createElementNS(HTML_NS, "input");
     input.type = "search";
-    input.placeholder = "Search archived tabs…";
+    input.setAttribute("data-l10n-id", "zen-tab-archive-search-placeholder");
     input.addEventListener("input", () => renderInto(root, input.value));
-    searchWrap.appendChild(input);
+    searchBox.append(libraryIcon("search-glass.svg"), input);
+
+    const filterButton = document.createElementNS(HTML_NS, "button");
+    filterButton.className = "zen-library-filter-button";
+    const filterButtonLabel = document.createElementNS(HTML_NS, "span");
+    filterButtonLabel.setAttribute("data-l10n-id", "library-filter-button");
+    filterButton.append(libraryIcon("circle-bars-filter.svg"), filterButtonLabel);
+
+    searchHeader.append(searchBox, filterButton);
+
+    const filterHeader = document.createElementNS(HTML_NS, "div");
+    filterHeader.className = "zen-library-filter-header";
+    const filterTitle = document.createElementNS(HTML_NS, "h2");
+    filterTitle.setAttribute("data-l10n-id", "zen-tab-archive-filter-title");
+    const doneButton = document.createElementNS(HTML_NS, "button");
+    doneButton.className = "zen-library-filter-done";
+    doneButton.setAttribute("data-l10n-id", "library-filter-done");
+    filterHeader.append(filterTitle, doneButton);
+
+    const filterPanel = document.createElementNS(HTML_NS, "div");
+    filterPanel.className = "zen-library-filter-panel";
+    const filterPanelInner = document.createElementNS(HTML_NS, "div");
+    filterPanelInner.className = "zen-library-filter-panel-inner";
+    const filterGroup = document.createElementNS(HTML_NS, "div");
+    filterGroup.className = "zen-library-filter-group";
+    const groupTitle = document.createElementNS(HTML_NS, "h3");
+    groupTitle.setAttribute("data-l10n-id", "zen-tab-archive-filter-when");
+    const filterOptions = document.createElementNS(HTML_NS, "div");
+    filterOptions.className = "zen-library-filter-options";
+
+    for (const [key, l10nId] of [
+      ["today", "library-filter-today"],
+      ["week", "library-filter-week"],
+      ["month", "library-filter-month"],
+    ]) {
+      const chip = document.createElementNS(HTML_NS, "button");
+      chip.className = "zen-library-filter-chip";
+      chip.dataset.when = key;
+      const chipLabel = document.createElementNS(HTML_NS, "span");
+      chipLabel.setAttribute("data-l10n-id", l10nId);
+      chip.appendChild(chipLabel);
+      chip.addEventListener("click", () => {
+        activeWhen = activeWhen === key ? null : key;
+        for (const c of filterOptions.children) c.toggleAttribute("active", c.dataset.when === activeWhen);
+        renderInto(root, input.value);
+      });
+      filterOptions.appendChild(chip);
+    }
+
+    filterGroup.append(groupTitle, filterOptions);
+    filterPanelInner.appendChild(filterGroup);
+    filterPanel.appendChild(filterPanelInner);
+
+    filterButton.addEventListener("click", () => {
+      searchTop.setAttribute("open", "true");
+      root.style.setProperty("--zen-library-filter-height", `${filterPanelInner.scrollHeight + 8}px`);
+    });
+    doneButton.addEventListener("click", () => searchTop.removeAttribute("open"));
+
+    searchTop.append(searchHeader, filterHeader, filterPanel);
 
     const list = document.createElementNS(HTML_NS, "div");
-    list.className = "zal-list";
+    list.className = "zal-list zen-library-search-results";
 
-    root.append(searchWrap, list);
+    root.append(searchTop, list);
     renderInto(root);
     return root;
   }
