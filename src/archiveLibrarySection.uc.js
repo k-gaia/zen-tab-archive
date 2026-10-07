@@ -229,9 +229,14 @@
        which have separate stroke-only paths, but history.svg is a plain
        fill-only icon with no stroke path, so zeroing its fill leaves
        nothing. Override with higher specificity to keep it visible in
-       both states instead of chasing a stroke-only variant of the icon. */
+       both states instead of chasing a stroke-only variant of the icon.
+       Uses --stroke (the bright accent color the others' outline uses),
+       not --fill (a muted 60%-toward-white/black mix) -- --fill looked
+       noticeably darker/muddier than the other icons' thin bright
+       outlines when inactive, confirmed live. Ours stays solid rather
+       than hollow, but at least matches their brightness. */
     .zen-library-tab:not([active])[data-section="archived-tabs"] .zen-library-tab-icon-image {
-      fill: var(--fill);
+      fill: var(--stroke);
     }
   `;
 
