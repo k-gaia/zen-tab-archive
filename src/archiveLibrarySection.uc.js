@@ -403,9 +403,19 @@
     filterButton.append(libraryIcon("circle-bars-filter.svg"), filterButtonLabel);
 
     searchHeader.append(searchBox, filterButton);
+    // searchHeader and filterHeader share the same CSS grid cell (stacked
+    // via grid-area: 1/1 in zen-library.css) and are told apart only by
+    // opacity -- neither gets pointer-events:none when hidden. Zen's real
+    // ZenLibrarySearchSection instead toggles the `inert` attribute on
+    // whichever one is currently invisible (confirmed from its render()):
+    // inert removes a subtree from hit-testing/focus entirely. Without this,
+    // filterHeader (appended after searchHeader, so painted on top) swallows
+    // every click aimed at the search box/filter button underneath it.
+    searchHeader.inert = false;
 
     const filterHeader = document.createElementNS(HTML_NS, "div");
     filterHeader.className = "zen-library-filter-header";
+    filterHeader.inert = true;
     const filterTitle = document.createElementNS(HTML_NS, "h2");
     filterTitle.setAttribute("data-l10n-id", "zen-tab-archive-filter-title");
     const doneButton = document.createElementNS(HTML_NS, "button");
@@ -417,6 +427,7 @@
     filterPanel.className = "zen-library-filter-panel";
     const filterPanelInner = document.createElementNS(HTML_NS, "div");
     filterPanelInner.className = "zen-library-filter-panel-inner";
+    filterPanelInner.inert = true;
     const filterGroup = document.createElementNS(HTML_NS, "div");
     filterGroup.className = "zen-library-filter-group";
     const groupTitle = document.createElementNS(HTML_NS, "h3");
@@ -450,8 +461,16 @@
     filterButton.addEventListener("click", () => {
       searchTop.setAttribute("open", "true");
       root.style.setProperty("--zen-library-filter-height", `${filterPanelInner.scrollHeight + 8}px`);
+      searchHeader.inert = true;
+      filterHeader.inert = false;
+      filterPanelInner.inert = false;
     });
-    doneButton.addEventListener("click", () => searchTop.removeAttribute("open"));
+    doneButton.addEventListener("click", () => {
+      searchTop.removeAttribute("open");
+      searchHeader.inert = false;
+      filterHeader.inert = true;
+      filterPanelInner.inert = true;
+    });
 
     searchTop.append(searchHeader, filterHeader, filterPanel);
 
