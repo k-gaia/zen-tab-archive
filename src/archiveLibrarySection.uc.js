@@ -241,6 +241,18 @@
     .zen-library-tab:not([active])[data-section="archived-tabs"] .zen-library-tab-icon-image {
       opacity: 0.45;
     }
+    /* Zen plays a 36-frame sprite-step animation on [animate] (confirmed
+       in zen-library.css: translateX from 0 to -35 * one frame width,
+       steps(36, jump-none)) -- assumes a 1008px sprite sliding behind a
+       fixed one-frame clip window. We already resize our icon down to
+       one frame, so that same translateX instead drags our actual image
+       ~700px off to the side for the animation's duration, then snaps
+       back to 0 the instant [animate] is removed -- looks exactly like
+       "disappears, then flashes back". No sprite, so no reason to run
+       this animation at all. */
+    .zen-library-tab[animate][data-section="archived-tabs"] .zen-library-tab-icon-image {
+      animation: none;
+    }
   `;
 
   function ensureStyle() {
