@@ -220,8 +220,23 @@
       background-image: url("chrome://sine/content/zen-tab-archive/src/icons/archived-tabs.svg");
       width: var(--zen-library-sprite-size);
     }
-    .zen-library-tab[animate][data-section="archived-tabs"] .zen-library-tab-icon-image {
-      animation: none;
+    /* Zen's [animate] sprite-step animation (translateX across 36 hand-drawn
+       frames, steps(36, jump-none), 0.583s -- see zen-library.css) assumes a
+       sprite; with one static frame it just drags the icon off to the side
+       and snaps back (the "disappears then flashes back" bug). Hand-drawing
+       36 frames for a 2-shape glyph isn't worth it, so this swaps in a
+       transform-only "pop" instead: same trigger ([animate], same
+       prefers-reduced-motion guard Zen's own rule uses), same rough duration,
+       no sprite assumption. */
+    @media (prefers-reduced-motion: no-preference) {
+      .zen-library-tab[animate][data-section="archived-tabs"] .zen-library-tab-icon-image {
+        animation: zen-tab-archive-icon-pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+      }
+    }
+    @keyframes zen-tab-archive-icon-pop {
+      from { transform: scale(0.75); }
+      60% { transform: scale(1.12); }
+      to { transform: scale(1); }
     }
   `;
 
