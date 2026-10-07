@@ -18,6 +18,9 @@
     },
     "src/archiveSidebar.uc.js": {
       "include": ["chrome://browser/content/browser.xhtml"]
+    },
+    "src/archiveLibrarySection.uc.js": {
+      "include": ["chrome://browser/content/browser.xhtml"]
     }
   }
 }
