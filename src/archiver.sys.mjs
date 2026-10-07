@@ -147,9 +147,8 @@ export async function scanOnce() {
 // instance's module-scope variable, so it would never be able to cancel a
 // timer that instance started. Storing it on the window (which persists
 // across reloads) lets a new instance find and clear whatever the last one
-// left running. See the identical writeup in archiveSidebar.mjs for the
-// full failure mode this avoids -- orphaned timers silently continuing to
-// archive tabs with stale logic in the background.
+// left running -- avoiding orphaned timers silently continuing to archive
+// tabs with stale logic in the background.
 const TIMER_KEY = "__zenArchiverTimer";
 
 export function start() {

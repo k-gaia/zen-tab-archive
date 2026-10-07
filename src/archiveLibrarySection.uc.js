@@ -1,11 +1,11 @@
 // archiveLibrarySection.uc.js — a section in Zen 1.23b's new Library
-// feature (<zen-library>), showing the same cross-workspace archived-tabs
-// view as the popup (archiveView.uc.js), just homed in the Library instead
-// of a toolbar popup.
+// feature (<zen-library>), showing archived tabs grouped by workspace with
+// search/filter. Replaced the earlier toolbar-popup (archiveView.uc.js) and
+// per-workspace sidebar ghost-tabs section (archiveSidebar.uc.js), both
+// removed once this covered both their use cases in one place.
 //
-// A Sine "window script" (.uc.js), same loading model as the other two UI
-// files — runs directly in the browser window's own scope, gBrowser/
-// gZenWorkspaces/document are bare globals.
+// A Sine "window script" (.uc.js) — runs directly in the browser window's
+// own scope, gBrowser/gZenWorkspaces/document are bare globals.
 //
 // Confirmed live (dryrun/probe-zen-library.js) before writing this:
 //   - <zen-library> is a PERMANENT element (always in the DOM, toggled via

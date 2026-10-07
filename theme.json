@@ -13,12 +13,6 @@
   "scripts": {
     "src/archiveStore.sys.mjs": {},
     "src/archiver.sys.mjs": {},
-    "src/archiveView.uc.js": {
-      "include": ["chrome://browser/content/browser.xhtml"]
-    },
-    "src/archiveSidebar.uc.js": {
-      "include": ["chrome://browser/content/browser.xhtml"]
-    },
     "src/archiveLibrarySection.uc.js": {
       "include": ["chrome://browser/content/browser.xhtml"]
     }

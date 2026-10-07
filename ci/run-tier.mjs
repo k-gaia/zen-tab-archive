@@ -22,8 +22,8 @@ const CHECKS = {
       script: `return !!window.ZenTabArchive;`,
     },
     {
-      name: "view and sidebar modules attached",
-      script: `return !!(window.ZenTabArchive?.view && window.ZenTabArchive?.sidebar);`,
+      name: "librarySection module attached",
+      script: `return !!window.ZenTabArchive?.librarySection;`,
     },
     {
       name: "sidebar foot toolbar exists",
@@ -60,17 +60,17 @@ const CHECKS = {
         return found && gone;`,
     },
     {
-      name: "sidebar renders a section for a workspace with records",
-      script: `const a = ChromeUtils.importESModule("chrome://sine/content/zen-tab-archive/src/archiver.sys.mjs");
-        const s = ChromeUtils.importESModule("chrome://sine/content/zen-tab-archive/src/archiveStore.sys.mjs");
+      name: "library section renders a row for a workspace with records",
+      script: `const s = ChromeUtils.importESModule("chrome://sine/content/zen-tab-archive/src/archiveStore.sys.mjs");
         const wsId = gZenWorkspaces.activeWorkspace;
         const id = "ci-render-" + Date.now();
         await s.appendTab({ id, workspaceId: wsId, url: "about:blank", title: "ci render probe", favicon: null,
           archivedAt: Date.now(), lastAccessedAt: Date.now(), tabState: {} });
-        window.ZenTabArchive.sidebar.refreshAll();
+        const node = window.ZenTabArchive.librarySection.Section.render();
         await new Promise((r) => setTimeout(r, 300));
-        const section = document.getElementById(wsId)?.querySelector(".zen-archive-ghost-section");
-        const ok = !!section && section.style.display !== "none";
+        node.querySelector(".zal-group-header")?.click(); // groups start collapsed
+        await new Promise((r) => setTimeout(r, 300));
+        const ok = node.textContent.includes("ci render probe");
         await s.removeTab(id);
         return ok;`,
     },

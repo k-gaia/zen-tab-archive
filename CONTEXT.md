@@ -427,6 +427,17 @@ against the copy. Archives persist in the copy's own
 9. ~~Library section~~ — done, `src/archiveLibrarySection.uc.js`, confirmed
    fully working live (icon, label, grouped view, all of it). See "Library
    section — the full story" below.
+10. ~~Retire the popup and sidebar ghost-tabs section~~ — done. Once the
+    Library section grew real search + a "When archived" filter (see "Library
+    section — the full story"), it covered both of the older views' use
+    cases — cross-workspace browsing (`archiveView.uc.js`'s popup) and
+    per-workspace ambient glance (`archiveSidebar.uc.js`'s ghost rows) — in
+    one place, with better UI than either. Both files deleted along with
+    their `theme.json` entries and dev-only probes; the trade-off accepted
+    is losing the sidebar's no-click ambient glance in exchange for one
+    source of truth and less chrome clutter. `ci/run-tier.mjs`'s
+    "view and sidebar modules attached" / "sidebar renders a section..."
+    checks replaced with library-section equivalents.
 
 ### Packaging — Sine mod
 
