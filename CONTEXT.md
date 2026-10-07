@@ -424,6 +424,9 @@ against the copy. Archives persist in the copy's own
    Run workflow. Unverified: the driver layer (geckodriver driving a headless
    Zen binary in chrome context) is the riskiest piece and will need
    iteration on the first real run. See "CI design notes" below.
+9. ~~Library section~~ — done, `src/archiveLibrarySection.uc.js`, confirmed
+   fully working live (icon, label, grouped view, all of it). See "Library
+   section — the full story" below.
 
 ### Packaging — Sine mod
 
@@ -814,16 +817,79 @@ archiving and the UI injection are both JS, native mods can't host this
 project; Sine (or an equivalent loader) stays a hard requirement, not a
 choice.
 
-**Idea floated, parked for now: a Library section.** Zen 1.23b also
-shipped a new Library feature (confirmed `src/zen/library/`, a LIT
-component `<zen-library>` with sections for History/Downloads/Boosts/
-Media/Spaces). No public registration API — `zenLibrarySections` is a
-plain hardcoded object in the component, so adding our own section would
-mean reaching into a live component instance and injecting a key, same
-category of move as everything else in this project, but on the *newest*
-and least-proven internal surface we'd have touched yet. Parked until
-Sine-on-1.23b and the canary are both solid, which (per above) just
-became true — worth revisiting.
+**Library section: tried, hit real resistance, pushed through anyway, now
+working.** See "Library section — the full story" below.
+
+### Library section — the full story
+
+`src/archiveLibrarySection.uc.js` adds an "Archived Tabs" entry to Zen
+1.23b's new Library feature (`<zen-library>`), showing the same
+grouped-by-workspace archived-tabs view as the popup. **Confirmed fully
+working live**, icon included, after several real dead ends:
+
+- **`<zen-library>` is a permanent LitElement**, confirmed via a dedicated
+  probe (`dryrun/probe-zen-library.js`) before writing any code — always in
+  the DOM (`#browser > #zen-main-app-wrapper > body > #main-window`),
+  toggled via an `open` attribute rather than created on demand, no shadow
+  DOM (`createRenderRoot() { return this; }`, confirmed in Zen's own
+  `ZenLibrarySearchSection.mjs`). `zenLibrarySections` is a plain object
+  with no public registration API — same move as everywhere else in this
+  project: reach in, add a key, call `requestUpdate()`.
+- **Dropped lit entirely, despite Zen's own sections using it.**
+  `ChromeUtils.importESModule("chrome://global/content/vendor/lit.all.mjs")`
+  threw `ReferenceError: document is not defined` — confirmed live, not
+  guessed. Same root cause as `archiver.sys.mjs` early in this project:
+  `importESModule` always gives a privileged module-global scope with no
+  `document`/`window`, no matter who calls it or when; Zen's own
+  `ZenLibrary.mjs` avoids this because it's compiled in at build time
+  through a path we don't have at runtime. The import was the first line
+  of the file, so it was silently aborting the *entire* script every time
+  (that's why `window.ZenTabArchive.librarySection` kept coming back
+  `undefined` — easy to misread as "the tab list didn't render" when the
+  real issue was "the script never got past line 1"). Checked
+  `ZenLibrary.mjs`'s own render path before rewriting: the sidebar tab icon
+  needs only `static id`/`label`, no `render()` call; the content area
+  accepts a plain DOM Node as an embeddable child, not strictly a lit
+  `TemplateResult`. So the section is built exactly like the popup and
+  sidebar — imperative DOM, no `customElements.define`, no lit import.
+- **The tab label needed a real Fluent resource, not plain text** —
+  `Section.label` is an l10n id consumed via `data-l10n-id` in
+  `<zen-library>`'s own template (confirmed: Zen's own sections use ids
+  like `"library-history-section-title"`). First attempt called
+  `document.l10n.addResourceIds()` with the `.ftl` file's full absolute
+  `chrome://` path, which produced `"Missing resource in locale
+  en-US/en-GB"` warnings — `addResourceIds()` treats its argument as a
+  resource id to resolve against *registered* locale sources, not an
+  arbitrary absolute URL, so it tried and failed to find a source covering
+  an id shaped like a full path, for every negotiated locale. The real
+  mechanism (confirmed from `dom/webidl/Localization.webidl`'s doc
+  comments and Mozilla's own `L10nFileSource.createMock()` test-writing
+  docs, after searchfox and GitHub code search were both unavailable):
+  register an actual `L10nFileSource` — name, a metasource category, the
+  locales it covers, and a `prePath` URL *template* with a `{locale}`
+  placeholder — then add the resource by its relative filename, resolved
+  against that template. `.ftl` file lives at `src/locale/en-US/
+  zen-tab-archive.ftl` to match. `L10nRegistry`/`L10nFileSource` are
+  WebIDL `[Exposed=Window]` interfaces, same as `Localization` itself
+  (`document.l10n`) — real bare globals in window scope, no
+  `ChromeUtils.importESModule` needed, so none of this risks the same
+  `document is not defined` failure the lit import did.
+- **The icon** uses the exact same `[data-section="..."] 
+  .zen-library-tab-icon-image { background-image: url(...) }` selector
+  convention as Zen's own sections (confirmed from `zen-library.css`) —
+  reuses `history.svg`, the same icon as the sidebar button/section, for
+  consistency across all three surfaces (popup, sidebar, Library).
+
+Net: this genuinely did hit the "too much resistance" threshold at least
+twice (the lit crash, then the Fluent registration dead end where
+searchfox/GitHub search access ran out) — pushed through both because
+each time there was a concrete, real next thing to check (what does
+`ZenLibrary.mjs` actually require for `render()`; what does Mozilla's own
+test-writing documentation show for the real constructor), not just
+more guessing. Worth remembering as a pattern for next time something
+like this comes up: the difference between "stuck" and "one more real
+lead to check" is usually whether there's still a primary source left to
+read.
 
 ### Deferred (do NOT do yet)
 - **Post on Zen Discussions #5414** (and maybe #2326) flagging the mod as built
