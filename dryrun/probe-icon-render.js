@@ -21,8 +21,16 @@
   document.getElementById("zen-tab-archive-icon-debug")?.remove();
   const wrap = document.createElement("div");
   wrap.id = "zen-tab-archive-icon-debug";
-  wrap.style.cssText = "position:fixed;top:40px;left:40px;z-index:99999999;box-shadow:0 0 0 2px red;";
-  wrap.innerHTML = recolored;
+  wrap.style.cssText = "position:fixed;top:40px;left:40px;z-index:99999999;box-shadow:0 0 0 2px red;background:#222;";
+
+  // innerHTML on a privileged chrome document strips "unsafe" attributes
+  // (confirmed live: it silently dropped xmlns off the <svg>, breaking the
+  // very thing we're trying to check) -- parse and import the node
+  // properly instead of assigning a markup string.
+  const doc = new DOMParser().parseFromString(recolored, "image/svg+xml");
+  const svgEl = document.importNode(doc.documentElement, true);
+  wrap.appendChild(svgEl);
   document.documentElement.appendChild(wrap);
   console.log("[zen-tab-archive/probe] injected debug render, top-left of the window");
+  console.log("[zen-tab-archive/probe] parse errors:", doc.querySelector("parsererror")?.textContent || "none");
 })();
