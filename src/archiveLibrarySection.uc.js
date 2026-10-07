@@ -226,17 +226,20 @@
        Zen's base rule does .zen-library-tab:not([active])
        .zen-library-tab-icon-image { fill: transparent } so inactive tabs
        show only a stroke outline -- works for Zen's own sprite icons,
-       which have separate stroke-only paths, but history.svg is a plain
-       fill-only icon with no stroke path, so zeroing its fill leaves
-       nothing. Override with higher specificity to keep it visible in
-       both states instead of chasing a stroke-only variant of the icon.
-       Uses --stroke (the bright accent color the others' outline uses),
-       not --fill (a muted 60%-toward-white/black mix) -- --fill looked
-       noticeably darker/muddier than the other icons' thin bright
-       outlines when inactive, confirmed live. Ours stays solid rather
-       than hollow, but at least matches their brightness. */
+       which have genuinely separate stroke-only paths (selecting them
+       doesn't recolor anything, it layers the fill paths on top of an
+       outline that was already there), but history.svg is a plain
+       fill-only icon with no stroke path at all, so zeroing its fill
+       leaves nothing -- there's no separate geometry to fall back to
+       without authoring a new two-path icon. Closest honest match without
+       new artwork: keep fill colour constant across both states (no more
+       swapping --fill/--stroke, which just looked like a plain recolor)
+       and use opacity to dim it when inactive, same idea as theirs --
+       dimmer until selected -- expressed the only way available for a
+       single-path icon. */
     .zen-library-tab:not([active])[data-section="archived-tabs"] .zen-library-tab-icon-image {
-      fill: var(--stroke);
+      fill: var(--fill);
+      opacity: 0.55;
     }
   `;
 
