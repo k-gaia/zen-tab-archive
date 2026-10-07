@@ -22,7 +22,10 @@ permissions:
 
 env:
   SINE_BOOTLOADER_TAG: v0.1.4
-  SINE_ENGINE_TAG: v2.3.3
+  # v2.3.3 didn't load reliably on Zen 1.23b (the Sine Mods settings page
+  # disappeared) -- confirmed live that the v2.3.4.1c pre-release fixes it
+  # (its changelog claims it resolves #564, a startup mod-loading bug).
+  SINE_ENGINE_TAG: v2.3.4.1c
   MOZ_REMOTE_ALLOW_SYSTEM_ACCESS: "1"
   GH_TOKEN: ${{ github.token }}
 

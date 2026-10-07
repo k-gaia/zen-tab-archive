@@ -771,6 +771,60 @@ not, there's no clean way to gate a broken build from reaching users
 regardless of how good the CI signal is, which matters for how much this
 is worth building before the mod is actually published.
 
+**Resolved, the hard way: Sine doesn't gate anything, confirmed from its own
+source.** Neither `manager.sys.mjs` nor `utils.sys.mjs` reads a Zen version
+or the `fork` field at all — `theme.json`'s `fork: ["zen"]` (which Nebula
+and other mods declare) is purely documentation; Sine ignores it. So there
+genuinely is no way to stop a user on an old Zen from getting a build that
+assumes newer internals — the canary + a human-readable `tested-zen` field
+is the only real lever, which is what's in `theme.json` now.
+
+**The scoping already caught something real.** `include: [".*"]` is Sine's
+default for `.uc.js` scripts, meaning ours were loading into every chrome
+window, not just the main browser — confirmed by checking Nebula's own
+`theme.json`, which scopes its script to
+`chrome://browser/content/browser.xhtml`. Ours now does the same. Never
+confirmed whether this was actually throwing in e.g. the Library window
+before the fix, but the risk was real regardless (`buildButton()` throws
+if `#zen-sidebar-foot-buttons` doesn't exist).
+
+**Lived through exactly the compatibility problem this whole CI idea is
+for, on Zen 1.23b.** The in-app updater moved the real profile and the test
+profile from 1.22.3b to 1.23b (a release that also shipped a brand-new
+native "Zen Mods" system, CSS/prefs-only, no JS — see below). After the
+update, Sine's own settings page vanished — a known, still-open upstream
+bug ([CosmoCreeper/Sine#675](https://github.com/CosmoCreeper/Sine/issues/675),
+same symptom, no fix documented there). Our installed Sine engine was
+`v2.3.3` (stable, May); the newest available is the `v2.3.4.1c`
+**pre-release** (25 August), whose changelog claims it "resolves #564", a
+startup mod-loading reliability bug. Swapped just the engine (`chrome/JS/`
+only — confirmed via the release zip's contents that it doesn't touch
+`sine-mods/` or the bootloader's `utils/`) into the test profile, old
+engine backed up alongside it rather than deleted. **Confirmed working**:
+Sine loads, our mod's changes show, no problems reported. CI's
+`SINE_ENGINE_TAG` bumped to `v2.3.4.1c` to match. No Sine release yet
+explicitly claims 1.23b support — this was found and verified live, not
+documented anywhere upstream.
+
+**Zen 1.23b's native "Zen Mods" system is CSS/prefs-only, not a Sine
+replacement.** Confirmed from `ZenMods.mjs` source: a mod folder
+contributes `chrome.css`/`content.css` and `preferences.json`-driven CSS
+variables or show/hide toggles — no JavaScript execution at all. Since
+archiving and the UI injection are both JS, native mods can't host this
+project; Sine (or an equivalent loader) stays a hard requirement, not a
+choice.
+
+**Idea floated, parked for now: a Library section.** Zen 1.23b also
+shipped a new Library feature (confirmed `src/zen/library/`, a LIT
+component `<zen-library>` with sections for History/Downloads/Boosts/
+Media/Spaces). No public registration API — `zenLibrarySections` is a
+plain hardcoded object in the component, so adding our own section would
+mean reaching into a live component instance and injecting a key, same
+category of move as everything else in this project, but on the *newest*
+and least-proven internal surface we'd have touched yet. Parked until
+Sine-on-1.23b and the canary are both solid, which (per above) just
+became true — worth revisiting.
+
 ### Deferred (do NOT do yet)
 - **Post on Zen Discussions #5414** (and maybe #2326) flagging the mod as built
   and available to try, to raise upstream interest — **only once the mod is
