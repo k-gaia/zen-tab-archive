@@ -200,6 +200,16 @@
     .zal-actions .zal-forget { background: var(--zen-colors-secondary, ButtonFace); }
     .zal-actions .zal-forget:hover { background: color-mix(in srgb, #ff5f57 22%, var(--zen-colors-secondary, ButtonFace)); }
     .zal-empty { padding: 32px 10px; text-align: center; opacity: 0.5; font-size: 12.5px; }
+    /* Confirmed from Zen's own zen-library.css: each tab's icon is set via
+       background-image on .zen-library-tab-icon-image, keyed by the same
+       [data-section="..."] selector convention, with a shared base rule
+       elsewhere already providing -moz-context-properties theming. Reusing
+       history.svg (same icon as our sidebar button and section) keeps all
+       three surfaces visually consistent, rather than a mismatched icon or
+       none at all. */
+    [data-section="archived-tabs"] :is(.zen-library-tab-icon-image, .empty-state-icon-image) {
+      background-image: url("chrome://browser/skin/zen-icons/history.svg");
+    }
   `;
 
   function ensureStyle() {
@@ -373,7 +383,6 @@
         registry.registerSources([source]);
       }
       document.l10n?.addResourceIds([FTL_RESOURCE_ID]);
-      console.log("[zen-tab-archive/library] Fluent source registered OK");
     } catch (err) {
       console.log("[zen-tab-archive/library] Fluent registration FAILED:", err.message, err);
     }
@@ -385,13 +394,8 @@
 
     const tryInstall = () => {
       const lib = document.querySelector("zen-library");
-      console.log("[zen-tab-archive/library] <zen-library> found:", !!lib);
-      if (!lib) return false;
-      console.log("[zen-tab-archive/library] zenLibrarySections before:", lib.zenLibrarySections ? Object.keys(lib.zenLibrarySections) : lib.zenLibrarySections);
-      if (!lib.zenLibrarySections) return false;
+      if (!lib || !lib.zenLibrarySections) return false;
       lib.zenLibrarySections = { ...lib.zenLibrarySections, [SECTION_ID]: ZenArchiveLibrarySection };
-      console.log("[zen-tab-archive/library] zenLibrarySections after:", Object.keys(lib.zenLibrarySections));
-      console.log("[zen-tab-archive/library] has requestUpdate:", typeof lib.requestUpdate === "function");
       lib.requestUpdate?.();
       return true;
     };
