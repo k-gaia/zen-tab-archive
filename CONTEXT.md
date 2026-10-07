@@ -924,6 +924,33 @@ to read — and when CSS-side hacking starts compounding without landing,
 that's the signal to go find the primary source instead of tuning another
 knob.
 
+**One more bug after the icon was actually correct: a stale chrome://
+image-decode cache.** After fixing the two-channel icon and the XML
+comment, the icon still didn't render — not dim, not miscolored, fully
+absent — in a brand new window. Ruled out sizing, geometry (confirmed by
+injecting the real SVG with hardcoded colors directly into the page,
+bypassing CSS/`-moz-context-properties` entirely — it rendered perfectly),
+and a `-moz-context-properties` privilege difference between Zen's own
+`chrome://browser/skin/...` resources and Sine's dynamically-registered
+`chrome://sine/content/<mod-id>/...` package (ruled out by testing a
+hardcoded-color version of the exact same file at the exact same URL —
+still invisible, so it wasn't about context-fill/stroke resolution at
+all). What finally fixed it: a **full quit and relaunch** of the test
+profile, not just a new window. Confirmed the mechanism: `fetch()` and a
+cache-busted `Image()` (`?bust=<timestamp>`) both loaded the file fine
+even before the restart, but the CSS `background-image: url(...)` in our
+`<style>` tag always references the *exact same, un-busted* URL — Gecko's
+image cache is keyed on that, and it had cached a failed decode of this
+exact chrome:// path from when the file still had the invalid `--`
+comment in it, back before that was fixed. New windows don't clear that
+in-memory cache within a running process; only a full restart does. The
+general lesson for this project's hot-reload workflow: `.uc.js` changes
+genuinely hot-reload on a new window (confirmed and relied on all
+session), but a **static asset's own content** (an image, a `.ftl` file)
+can get stuck behind a stale decode/fetch cache keyed on its unchanging
+URL, and needs a full restart to guarantee it's picked up — a new window
+is necessary but not always sufficient.
+
 ### Deferred (do NOT do yet)
 - **Post on Zen Discussions #5414** (and maybe #2326) flagging the mod as built
   and available to try, to raise upstream interest — **only once the mod is
