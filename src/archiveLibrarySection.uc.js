@@ -206,9 +206,21 @@
        elsewhere already providing -moz-context-properties theming. Reusing
        history.svg (same icon as our sidebar button and section) keeps all
        three surfaces visually consistent, rather than a mismatched icon or
-       none at all. */
+       none at all.
+       Confirmed live this wasn't enough by itself: Zen's own icons are
+       36-frame sprite sheets (a switch/hover animation, steps(36,
+       jump-none)), and the base rule sizes .zen-library-tab-icon-image to
+       the FULL sprite width (36 * one frame) unconditionally -- the
+       wrapper (.zen-library-tab-icon) then clips it back down to one
+       frame via overflow: clip. A probe confirmed computed width was
+       1008px (36 * 28px) against a 20px height, so our single-frame icon
+       was being stretched across the full sprite-sized box via
+       background-size: 100% 100% -- so thin and distorted it read as no
+       icon at all. We have no sprite, so set width back to one frame to
+       match. */
     [data-section="archived-tabs"] :is(.zen-library-tab-icon-image, .empty-state-icon-image) {
       background-image: url("chrome://browser/skin/zen-icons/history.svg");
+      width: var(--zen-library-sprite-size);
     }
   `;
 
