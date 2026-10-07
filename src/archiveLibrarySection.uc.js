@@ -222,6 +222,17 @@
       background-image: url("chrome://browser/skin/zen-icons/history.svg");
       width: var(--zen-library-sprite-size);
     }
+    /* Confirmed live: visible when the tab is active, gone when it isn't.
+       Zen's base rule does .zen-library-tab:not([active])
+       .zen-library-tab-icon-image { fill: transparent } so inactive tabs
+       show only a stroke outline -- works for Zen's own sprite icons,
+       which have separate stroke-only paths, but history.svg is a plain
+       fill-only icon with no stroke path, so zeroing its fill leaves
+       nothing. Override with higher specificity to keep it visible in
+       both states instead of chasing a stroke-only variant of the icon. */
+    .zen-library-tab:not([active])[data-section="archived-tabs"] .zen-library-tab-icon-image {
+      fill: var(--fill);
+    }
   `;
 
   function ensureStyle() {
