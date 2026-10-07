@@ -318,8 +318,13 @@
 
     const tryInstall = () => {
       const lib = document.querySelector("zen-library");
-      if (!lib || !lib.zenLibrarySections) return false;
+      console.log("[zen-tab-archive/library] <zen-library> found:", !!lib);
+      if (!lib) return false;
+      console.log("[zen-tab-archive/library] zenLibrarySections before:", lib.zenLibrarySections ? Object.keys(lib.zenLibrarySections) : lib.zenLibrarySections);
+      if (!lib.zenLibrarySections) return false;
       lib.zenLibrarySections = { ...lib.zenLibrarySections, [SECTION_ID]: ZenArchiveLibrarySection };
+      console.log("[zen-tab-archive/library] zenLibrarySections after:", Object.keys(lib.zenLibrarySections));
+      console.log("[zen-tab-archive/library] has requestUpdate:", typeof lib.requestUpdate === "function");
       lib.requestUpdate?.();
       return true;
     };
