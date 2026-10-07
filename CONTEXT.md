@@ -983,6 +983,18 @@ is necessary but not always sufficient.
 - **A part-filled Navy recruitment form** was among the 18 would-archive tabs on
   the real profile. Poster child for archive-with-recovery over hard-close —
   silently losing it is exactly the "punishing" failure to avoid.
+- **Sine caches each mod's manifest separately from its `theme.json`**, at
+  `chrome/sine-mods/mods.json` (one JSON blob, all installed mods, keyed by
+  id). Editing/syncing a mod's own `theme.json` in the profile does NOT
+  update this cache — found after deleting `archiveView.uc.js`/
+  `archiveSidebar.uc.js` and syncing the trimmed `theme.json`, but
+  `mods.json` still listed the deleted scripts. Sine then threw
+  `Error opening input stream (invalid filename?)` trying to load the
+  missing file, which aborted mod loading entirely (logged as
+  `[ZenMods]: No enabled Zen mods.`) — not just the two removed features
+  but the whole mod, including the Library section's tab. Fix: edit
+  `mods.json`'s `scripts` object to match `theme.json` too, any time a
+  script is added/removed/renamed, not just the per-mod file.
 
 ---
 
