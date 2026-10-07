@@ -15,27 +15,34 @@
 //   - zenLibrarySections is a plain object on the instance: no public
 //     registration API, just {media, downloads, boosts, spaces, history} --
 //     we add our own key and call requestUpdate() to force a re-render.
-//   - No shadow DOM (confirmed createRenderRoot() { return this; } in
-//     Zen's own ZenLibrarySearchSection.mjs) -- light DOM, so plain global
-//     CSS works here the same as the popup and sidebar.
+//   - No shadow DOM -- light DOM, so plain global CSS works here the same
+//     as the popup and sidebar.
 //
-// Each built-in section is ITSELF the custom element its own static
-// render(library) mounts (e.g. ZenLibraryBoostsSection both describes how
-// to mount <zen-library-boosts-section> AND implements it as a LitElement).
-// We follow the same pattern.
+// NOT using lit or MozLitElement, despite Zen's own sections doing so --
+// confirmed live this throws "ReferenceError: document is not defined"
+// (chrome://global/content/vendor/lit.all.mjs's own top-level code touches
+// document). ChromeUtils.importESModule ALWAYS gives a privileged
+// module-global scope with no document/window, no matter who calls it or
+// when -- the exact same limitation archiver.sys.mjs hit early in this
+// project. Zen's own ZenLibrary.mjs avoids this because it's compiled into
+// the browser at build time through a privileged loading path we don't have
+// at runtime. Checked ZenLibrary.mjs's own render() first: the tab icon in
+// the sidebar list is built straight from static id/label, no render() call
+// needed; the content area only calls Section.render(library) once a tab is
+// first opened, and accepts a plain DOM Node (not just a lit TemplateResult)
+// as an embeddable child. So we just build a plain Node, the same way the
+// popup and sidebar already do, and skip lit entirely.
 //
 // Section.label is a Fluent l10n id (confirmed: Zen's own sections use ids
 // like "library-history-section-title", resolved via data-l10n-id in
 // <zen-library>'s own template) -- not plain text. We ship our own .ftl and
 // register it with document.l10n.addResourceIds(), the real Fluent
-// mechanism for this, rather than fighting the shared template with a
-// workaround.
+// mechanism for this.
 
 (() => {
-  const { html } = ChromeUtils.importESModule("chrome://global/content/vendor/lit.all.mjs");
-  const { MozLitElement } = ChromeUtils.importESModule("chrome://global/content/lit-utils.mjs");
   const archiver = ChromeUtils.importESModule("chrome://sine/content/zen-tab-archive/src/archiver.sys.mjs");
 
+  const HTML_NS = "http://www.w3.org/1999/xhtml";
   const FTL_PATH = "chrome://sine/content/zen-tab-archive/src/locale/zen-tab-archive.ftl";
   const SECTION_ID = "archived-tabs";
   const STYLE_ID = "zen-archive-library-style";
@@ -179,139 +186,162 @@
 
   function ensureStyle() {
     document.getElementById(STYLE_ID)?.remove();
-    const style = document.createElementNS("http://www.w3.org/1999/xhtml", "style");
+    const style = document.createElementNS(HTML_NS, "style");
     style.id = STYLE_ID;
     style.textContent = CSS;
     document.documentElement.appendChild(style);
   }
 
-  class ZenArchiveLibrarySection extends MozLitElement {
-    static id = SECTION_ID;
-    static label = "zen-tab-archive-library-section-title";
+  // Workspace ids the user has expanded -- module-scope, persists across
+  // re-renders the same way the popup's expandedGroups does.
+  const expandedGroups = new Set();
 
-    static render(library) {
-      return html`
-        <zen-archive-library-section
-          class="zen-library-section"
-          data-section="${SECTION_ID}"
-          .library=${library}
-        ></zen-archive-library-section>
-      `;
+  function makeRow(record, rerender) {
+    const row = document.createElementNS(HTML_NS, "div");
+    row.className = "zal-row";
+
+    const icon = document.createElementNS(HTML_NS, "img");
+    icon.className = "zal-favicon";
+    if (record.favicon) icon.src = record.favicon;
+
+    const meta = document.createElementNS(HTML_NS, "div");
+    meta.className = "zal-meta";
+    const title = document.createElementNS(HTML_NS, "div");
+    title.className = "zal-title";
+    title.textContent = record.title || record.url;
+    const sub = document.createElementNS(HTML_NS, "div");
+    sub.className = "zal-sub";
+    sub.textContent = `${hostOf(record.url)} · ${fmtRelative(record.archivedAt)}`;
+    meta.append(title, sub);
+
+    const actions = document.createElementNS(HTML_NS, "div");
+    actions.className = "zal-actions";
+
+    const restoreBtn = document.createElementNS(HTML_NS, "button");
+    restoreBtn.className = "zal-restore";
+    restoreBtn.textContent = "Restore";
+    restoreBtn.addEventListener("click", async () => {
+      restoreBtn.disabled = true;
+      await archiver.restore(record.id);
+      rerender();
+    });
+
+    const forgetBtn = document.createElementNS(HTML_NS, "button");
+    forgetBtn.className = "zal-forget";
+    forgetBtn.textContent = "Forget";
+    forgetBtn.addEventListener("click", async () => {
+      forgetBtn.disabled = true;
+      await archiver.forget(record.id);
+      rerender();
+    });
+
+    actions.append(restoreBtn, forgetBtn);
+    row.append(icon, meta, actions);
+    return row;
+  }
+
+  async function renderInto(root, filterValue = "") {
+    const list = root.querySelector(".zal-list");
+    list.textContent = "";
+
+    const records = await archiver.list();
+    const q = filterValue.trim().toLowerCase();
+    const filtered = q
+      ? records.filter((r) => (r.title || "").toLowerCase().includes(q) || r.url.toLowerCase().includes(q))
+      : records;
+
+    if (filtered.length === 0) {
+      const empty = document.createElementNS(HTML_NS, "div");
+      empty.className = "zal-empty";
+      empty.textContent = records.length === 0 ? "No archived tabs yet." : "No matches.";
+      list.appendChild(empty);
+      return;
     }
 
-    createRenderRoot() {
-      return this;
+    const wsNames = new Map(
+      (gZenWorkspaces._workspaceCache ?? []).map((ws) => [ws.uuid, `${ws.icon ?? ""} ${ws.name}`.trim()])
+    );
+
+    const groups = new Map();
+    for (const r of filtered) {
+      const key = r.workspaceId || "(unknown)";
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(r);
     }
+    for (const rows of groups.values()) rows.sort((a, b) => b.archivedAt - a.archivedAt);
 
-    constructor() {
-      super();
-      this.records = [];
-      this.filter = "";
-      this.expandedGroups = new Set();
-    }
+    const rerender = () => renderInto(root, root.querySelector(".zal-search input")?.value ?? "");
 
-    connectedCallback() {
-      super.connectedCallback();
-      this.refresh();
-    }
+    for (const [wsId, rows] of groups) {
+      const isExpanded = expandedGroups.has(wsId);
 
-    async refresh() {
-      this.records = (await archiver.list()).sort((a, b) => b.archivedAt - a.archivedAt);
-    }
+      const header = document.createElementNS(HTML_NS, "div");
+      header.className = "zal-group-header";
+      const chevron = document.createElementNS(HTML_NS, "span");
+      chevron.className = "zal-chevron";
+      chevron.textContent = isExpanded ? "▾" : "▸";
+      const label = document.createElementNS(HTML_NS, "span");
+      label.textContent = `${wsNames.get(wsId) ?? wsId} (${rows.length})`;
 
-    #toggleGroup(wsId) {
-      if (this.expandedGroups.has(wsId)) this.expandedGroups.delete(wsId);
-      else this.expandedGroups.add(wsId);
-      this.requestUpdate();
-    }
+      const clearBtn = document.createElementNS(HTML_NS, "button");
+      clearBtn.className = "zal-clear-all";
+      clearBtn.textContent = "Forget all";
+      clearBtn.title = `Permanently discard all ${rows.length} archived tabs in this workspace`;
+      clearBtn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        if (!confirm(`Permanently forget all ${rows.length} archived tabs in "${wsNames.get(wsId) ?? wsId}"? This can't be undone.`)) return;
+        clearBtn.disabled = true;
+        await Promise.all(rows.map((r) => archiver.forget(r.id)));
+        rerender();
+      });
 
-    async #restore(id) {
-      await archiver.restore(id);
-      await this.refresh();
-    }
+      header.append(chevron, label, clearBtn);
+      header.addEventListener("click", () => {
+        if (expandedGroups.has(wsId)) expandedGroups.delete(wsId);
+        else expandedGroups.add(wsId);
+        rerender();
+      });
+      list.appendChild(header);
 
-    async #forget(id) {
-      await archiver.forget(id);
-      await this.refresh();
-    }
-
-    async #forgetAll(wsId, rows) {
-      if (!confirm(`Permanently forget all ${rows.length} archived tabs in this workspace? This can't be undone.`)) return;
-      await Promise.all(rows.map((r) => archiver.forget(r.id)));
-      await this.refresh();
-    }
-
-    #row(record) {
-      return html`
-        <div class="zal-row">
-          <img class="zal-favicon" src=${record.favicon || ""} />
-          <div class="zal-meta">
-            <div class="zal-title">${record.title || record.url}</div>
-            <div class="zal-sub">${hostOf(record.url)} · ${fmtRelative(record.archivedAt)}</div>
-          </div>
-          <div class="zal-actions">
-            <button class="zal-restore" @click=${() => this.#restore(record.id)}>Restore</button>
-            <button class="zal-forget" @click=${() => this.#forget(record.id)}>Forget</button>
-          </div>
-        </div>
-      `;
-    }
-
-    render() {
-      const q = this.filter.trim().toLowerCase();
-      const filtered = q
-        ? this.records.filter((r) => (r.title || "").toLowerCase().includes(q) || r.url.toLowerCase().includes(q))
-        : this.records;
-
-      const wsNames = new Map(
-        (gZenWorkspaces._workspaceCache ?? []).map((ws) => [ws.uuid, `${ws.icon ?? ""} ${ws.name}`.trim()])
-      );
-
-      const groups = new Map();
-      for (const r of filtered) {
-        const key = r.workspaceId || "(unknown)";
-        if (!groups.has(key)) groups.set(key, []);
-        groups.get(key).push(r);
+      if (isExpanded) {
+        for (const record of rows) list.appendChild(makeRow(record, rerender));
       }
-
-      return html`
-        <div class="zal-root">
-          <div class="zal-search">
-            <input
-              type="search"
-              placeholder="Search archived tabs…"
-              .value=${this.filter}
-              @input=${(e) => { this.filter = e.target.value; }}
-            />
-          </div>
-          <div class="zal-list">
-            ${filtered.length === 0
-              ? html`<div class="zal-empty">${this.records.length === 0 ? "No archived tabs yet." : "No matches."}</div>`
-              : [...groups].map(([wsId, rows]) => {
-                  const isExpanded = this.expandedGroups.has(wsId);
-                  return html`
-                    <div class="zal-group-header" @click=${() => this.#toggleGroup(wsId)}>
-                      <span class="zal-chevron">${isExpanded ? "▾" : "▸"}</span>
-                      <span>${wsNames.get(wsId) ?? wsId} (${rows.length})</span>
-                      <button
-                        class="zal-clear-all"
-                        title="Permanently discard all ${rows.length} archived tabs in this workspace"
-                        @click=${(e) => { e.stopPropagation(); this.#forgetAll(wsId, rows); }}
-                      >Forget all</button>
-                    </div>
-                    ${isExpanded ? rows.map((r) => this.#row(r)) : ""}
-                  `;
-                })}
-          </div>
-        </div>
-      `;
     }
   }
-  customElements.define("zen-archive-library-section", ZenArchiveLibrarySection);
 
-  // <zen-library> is permanent in the DOM (confirmed live), so this should
-  // find it immediately -- the retry is cheap insurance in case this script
-  // runs before it's been inserted for some reason.
+  function buildSectionNode() {
+    const root = document.createElementNS(HTML_NS, "div");
+    root.className = "zen-library-section zal-root";
+    root.dataset.section = SECTION_ID;
+
+    const searchWrap = document.createElementNS(HTML_NS, "div");
+    searchWrap.className = "zal-search";
+    const input = document.createElementNS(HTML_NS, "input");
+    input.type = "search";
+    input.placeholder = "Search archived tabs…";
+    input.addEventListener("input", () => renderInto(root, input.value));
+    searchWrap.appendChild(input);
+
+    const list = document.createElementNS(HTML_NS, "div");
+    list.className = "zal-list";
+
+    root.append(searchWrap, list);
+    renderInto(root);
+    return root;
+  }
+
+  // Matches Zen's own section contract (confirmed from ZenLibraryBoostsSection
+  // etc.): static id/label read by the sidebar tab list, static render(library)
+  // called once the tab is first opened. No customElements.define, no
+  // MozLitElement -- see the file header for why.
+  class ZenArchiveLibrarySection {
+    static id = SECTION_ID;
+    static label = "zen-tab-archive-library-section-title";
+    static render() {
+      return buildSectionNode();
+    }
+  }
+
   function install() {
     ensureStyle();
     document.l10n?.addResourceIds([FTL_PATH]);
