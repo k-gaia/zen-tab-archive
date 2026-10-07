@@ -1,11 +1,3 @@
-<!-- Archive-box icon, built to the same construction convention as Zen's
-   - own library sprites (confirmed from src/browser/themes/shared/
-   - zen-icons/common/library/library-history-sprite.svg): each shape drawn
-   - twice, once fill="context-fill" and once stroke="context-stroke"
-   - stroke-width="7.1", so Zen's native CSS (fill hidden while inactive,
-   - stroke always visible) works with no color overrides needed. A single
-   - static frame, not a 36-frame sprite -- that part Zen's CSS still needs
-   - overriding for (width, and disabling the sprite-step animation). -->
 <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 128 128" fill="none">
   <path fill="context-fill" d="M18 48a10 10 0 0 1 10-10h72a10 10 0 0 1 10 10v46a10 10 0 0 1-10 10H28a10 10 0 0 1-10-10Z"/>
   <path stroke="context-stroke" stroke-width="7.1" d="M18 48a10 10 0 0 1 10-10h72a10 10 0 0 1 10 10v46a10 10 0 0 1-10 10H28a10 10 0 0 1-10-10Z"/>
