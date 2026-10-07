@@ -222,24 +222,24 @@
       background-image: url("chrome://browser/skin/zen-icons/history.svg");
       width: var(--zen-library-sprite-size);
     }
-    /* Confirmed live: visible when the tab is active, gone when it isn't.
-       Zen's base rule does .zen-library-tab:not([active])
-       .zen-library-tab-icon-image { fill: transparent } so inactive tabs
-       show only a stroke outline -- works for Zen's own sprite icons,
-       which have genuinely separate stroke-only paths (selecting them
-       doesn't recolor anything, it layers the fill paths on top of an
-       outline that was already there), but history.svg is a plain
-       fill-only icon with no stroke path at all, so zeroing its fill
-       leaves nothing -- there's no separate geometry to fall back to
-       without authoring a new two-path icon. Closest honest match without
-       new artwork: keep fill colour constant across both states (no more
-       swapping --fill/--stroke, which just looked like a plain recolor)
-       and use opacity to dim it when inactive, same idea as theirs --
-       dimmer until selected -- expressed the only way available for a
-       single-path icon. */
+    /* history.svg is a plain fill-only icon -- no separate stroke path --
+       so we can't replicate the other sections' real mechanism (an
+       always-on bright stroke outline, with fill layered on top only
+       when active) without authoring a new two-path icon. Confirmed via
+       probe: --fill itself resolves to a muted, fairly dark color-mix
+       (not a bright tone), which is why both our states looked
+       practically identical even with an opacity difference -- the base
+       color was never bright to begin with, only --stroke is. Using
+       --stroke (the same bright accent color behind the other icons'
+       always-visible outline) for both of our states instead, varying
+       only opacity: dim-but-visible when inactive, full brightness when
+       active -- the closest available analog to "thin outline, bold
+       fill-in on select" for a single-path icon. */
+    .zen-library-tab[data-section="archived-tabs"] .zen-library-tab-icon-image {
+      fill: var(--stroke);
+    }
     .zen-library-tab:not([active])[data-section="archived-tabs"] .zen-library-tab-icon-image {
-      fill: var(--fill);
-      opacity: 0.55;
+      opacity: 0.45;
     }
   `;
 
