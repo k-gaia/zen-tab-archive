@@ -200,56 +200,35 @@
     .zal-actions .zal-forget { background: var(--zen-colors-secondary, ButtonFace); }
     .zal-actions .zal-forget:hover { background: color-mix(in srgb, #ff5f57 22%, var(--zen-colors-secondary, ButtonFace)); }
     .zal-empty { padding: 32px 10px; text-align: center; opacity: 0.5; font-size: 12.5px; }
-    /* Confirmed from Zen's own zen-library.css: each tab's icon is set via
-       background-image on .zen-library-tab-icon-image, keyed by the same
-       [data-section="..."] selector convention, with a shared base rule
-       elsewhere already providing -moz-context-properties theming. Reusing
-       history.svg (same icon as our sidebar button and section) keeps all
-       three surfaces visually consistent, rather than a mismatched icon or
-       none at all.
-       Confirmed live this wasn't enough by itself: Zen's own icons are
-       36-frame sprite sheets (a switch/hover animation, steps(36,
-       jump-none)), and the base rule sizes .zen-library-tab-icon-image to
-       the FULL sprite width (36 * one frame) unconditionally -- the
-       wrapper (.zen-library-tab-icon) then clips it back down to one
-       frame via overflow: clip. A probe confirmed computed width was
-       1008px (36 * 28px) against a 20px height, so our single-frame icon
-       was being stretched across the full sprite-sized box via
-       background-size: 100% 100% -- so thin and distorted it read as no
-       icon at all. We have no sprite, so set width back to one frame to
-       match. */
+    /* Dropped the earlier approach (reusing the plain, fill-only
+       history.svg + hand-tuned opacity/fill overrides to fake a
+       selected/unselected contrast) after going back to Zen's real
+       source. Its library icons are 36-frame sprite sheets built with a
+       genuine two-channel construction -- confirmed from
+       library-history-sprite.svg: every shape drawn twice, once
+       fill="context-fill" and once stroke="context-stroke"
+       stroke-width="7.1" -- so Zen's native CSS (fill hidden while
+       inactive, stroke always visible, filled in when active) just
+       works. src/icons/archived-tabs.svg follows the same two-channel
+       construction, as a single static frame instead of a 36-frame
+       sprite, so no color overrides are needed at all here -- only the
+       two things that are genuinely about frame count, not color:
+       - width: the base rule sizes icon-image to 36 * one frame
+         unconditionally (confirmed via probe: 1008px computed width
+         against a 20px height for a single-frame image, stretched
+         illegibly thin by background-size: 100% 100%) -- we have one
+         frame, so set width back to match it.
+       - the [animate] sprite-step animation (translateX 0 to -35 * one
+         frame width, steps(36, jump-none)) assumes a sprite sliding
+         behind a fixed clip window -- with no sprite, that same
+         translateX just drags our one frame off to the side and snaps
+         back when [animate] is removed (confirmed live: "disappears,
+         then flashes back" on selection). No sprite, so no reason to
+         run it. */
     [data-section="archived-tabs"] :is(.zen-library-tab-icon-image, .empty-state-icon-image) {
-      background-image: url("chrome://browser/skin/zen-icons/history.svg");
+      background-image: url("chrome://sine/content/zen-tab-archive/src/icons/archived-tabs.svg");
       width: var(--zen-library-sprite-size);
     }
-    /* history.svg is a plain fill-only icon -- no separate stroke path --
-       so we can't replicate the other sections' real mechanism (an
-       always-on bright stroke outline, with fill layered on top only
-       when active) without authoring a new two-path icon. Confirmed via
-       probe: --fill itself resolves to a muted, fairly dark color-mix
-       (not a bright tone), which is why both our states looked
-       practically identical even with an opacity difference -- the base
-       color was never bright to begin with, only --stroke is. Using
-       --stroke (the same bright accent color behind the other icons'
-       always-visible outline) for both of our states instead, varying
-       only opacity: dim-but-visible when inactive, full brightness when
-       active -- the closest available analog to "thin outline, bold
-       fill-in on select" for a single-path icon. */
-    .zen-library-tab[data-section="archived-tabs"] .zen-library-tab-icon-image {
-      fill: var(--stroke);
-    }
-    .zen-library-tab:not([active])[data-section="archived-tabs"] .zen-library-tab-icon-image {
-      opacity: 0.45;
-    }
-    /* Zen plays a 36-frame sprite-step animation on [animate] (confirmed
-       in zen-library.css: translateX from 0 to -35 * one frame width,
-       steps(36, jump-none)) -- assumes a 1008px sprite sliding behind a
-       fixed one-frame clip window. We already resize our icon down to
-       one frame, so that same translateX instead drags our actual image
-       ~700px off to the side for the animation's duration, then snaps
-       back to 0 the instant [animate] is removed -- looks exactly like
-       "disappears, then flashes back". No sprite, so no reason to run
-       this animation at all. */
     .zen-library-tab[animate][data-section="archived-tabs"] .zen-library-tab-icon-image {
       animation: none;
     }
