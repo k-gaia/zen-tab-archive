@@ -1,0 +1,9 @@
+{
+  "name": "zen-tab-archive-ci",
+  "private": true,
+  "type": "module",
+  "description": "Canary checks run against new Zen releases in GitHub Actions",
+  "dependencies": {
+    "selenium-webdriver": "^4.27.0"
+  }
+}

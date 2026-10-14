@@ -1,0 +1,11 @@
+node_modules/
+coverage/
+ci-results/
+ci/node_modules/
+
+# Local development only: live-browser probes, the dev journal, scratch work.
+dryrun/
+notes/
+CONTEXT.md
+scratch.js
+.out-of-code-insights/
