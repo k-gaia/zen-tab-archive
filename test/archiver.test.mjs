@@ -112,6 +112,64 @@ describe("startup", () => {
   });
 });
 
+describe("startup summary", () => {
+  const LAST = "uc.zen-tab-archive.last-startup";
+
+  test("first run: summarises only this start's scan, with a labelled View button", async () => {
+    await store.appendTab(record("from-before", { archivedAt: Date.now() - DAY }));
+    const win = useWindow({ tabs: [makeTab(), makeTab()] });
+    const before = Date.now();
+    await archiver.start();
+    const [toast] = win.gZenUIManager.toasts;
+    assert.equal(toast.messageId, "zen-tab-archive-summary-toast");
+    assert.deepEqual(toast.options.l10nArgs, { count: 2 }, "the existing archive isn't announced");
+    assert.equal(toast.options.timeout, 6000);
+    const button = win.document.getElementById(archiver.SUMMARY_BUTTON_ID);
+    assert.equal(button.getAttribute("tooltiptext"), "Open Archived Tabs");
+    assert.equal(button.getAttribute("aria-label"), "Open Archived Tabs");
+    assert.ok(Number(services.prefs.values[LAST]) >= before, "start time recorded for next time");
+  });
+
+  test("later starts count everything archived since the previous start", async () => {
+    const lastStart = Date.now() - 2 * DAY;
+    services.prefs.values[LAST] = String(lastStart);
+    await store.appendTab(record("before-last-start", { archivedAt: lastStart - HOUR }));
+    await store.appendTab(record("during-last-session", { archivedAt: lastStart + HOUR }));
+    const win = useWindow({ tabs: [makeTab()] });
+    await archiver.start();
+    assert.deepEqual(win.gZenUIManager.toasts[0].options.l10nArgs, { count: 2 });
+  });
+
+  test("no toast when nothing was archived", async () => {
+    const win = useWindow({ tabs: [makeTab({ selected: true })] });
+    await archiver.start();
+    assert.deepEqual(win.gZenUIManager.toasts, []);
+    assert.ok(services.prefs.values[LAST], "start time still recorded");
+  });
+
+  test("no toast when the summary is turned off, but the start time is still recorded", async () => {
+    services.prefs.values["uc.zen-tab-archive.startup-summary"] = false;
+    const win = useWindow({ tabs: [makeTab()] });
+    await archiver.start();
+    assert.deepEqual(win.gZenUIManager.toasts, []);
+    assert.ok(services.prefs.values[LAST]);
+  });
+
+  test("View opens the Library on Archived Tabs, unless it's already showing", async () => {
+    const win = useWindow({ tabs: [makeTab()] });
+    await archiver.start();
+    const view = win.gZenUIManager.toasts[0].options.button.command;
+    view();
+    assert.deepEqual(win.Library.toggles, ["archived-tabs"], "closed: opens it");
+    win.Library.isLibraryOpen = true;
+    view();
+    assert.equal(win.Library.toggles.length, 2, "open on another section: switches");
+    win.library.activeTab = "archived-tabs";
+    view();
+    assert.equal(win.Library.toggles.length, 2, "already showing: left alone rather than closed");
+  });
+});
+
 describe("scanOnce", () => {
   test("archives idle tabs and keeps everything else", async () => {
     const tabs = {

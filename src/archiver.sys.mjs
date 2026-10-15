@@ -38,6 +38,7 @@ const DEFAULTS = {
   "skip-essentials": true, // zen-essential, permanent shelf
   "skip-active": true, // currently selected tab (any workspace)
   "skip-audible": true, // tab currently playing sound
+  "startup-summary": true, // toast summarising what was archived since the last start
 };
 
 function getPref(key) {
@@ -157,13 +158,52 @@ export async function start() {
   await win.gZenWorkspaces.promiseInitialized;
   await win.SessionStore.promiseAllWindowsRestored;
   stop();
-  scanOnce();
+  const scanStartedAt = Date.now();
+  const firstScan = scanOnce();
   const intervalMin = getPref("interval-minutes");
   win[TIMER_KEY] = win.setInterval(scanOnce, intervalMin * 6e4);
   console.log(
     `%carchiver armed · scanning every ${intervalMin} min · call archiver.stop() to disarm`,
     "color:#9ece6a"
   );
+  await firstScan;
+  await showStartupSummary(win, scanStartedAt);
+}
+
+// Stored as a string: epoch ms overflows an int pref.
+const LAST_STARTUP_PREF = PREF_BRANCH + "last-startup";
+export const SECTION_ID = "archived-tabs";
+export const SUMMARY_BUTTON_ID = "zen-tab-archive-summary-view";
+
+// A brief Zen toast after the first scan: how many tabs are archived since
+// Zen was last started, with a button to open them. With no previous start
+// recorded (first run) only this start's scan counts, so an existing
+// archive isn't announced all at once.
+async function showStartupSummary(win, scanStartedAt) {
+  const since = parseFloat(Services.prefs.getStringPref(LAST_STARTUP_PREF, String(scanStartedAt)));
+  Services.prefs.setStringPref(LAST_STARTUP_PREF, String(scanStartedAt));
+  if (!getPref("startup-summary")) return;
+  const count = (await store.listTabs()).filter((t) => t.archivedAt >= since).length;
+  if (!count) return;
+  win.gZenUIManager.showToast("zen-tab-archive-summary-toast", {
+    l10nArgs: { count },
+    timeout: 6000,
+    button: { id: SUMMARY_BUTTON_ID, command: () => openArchive(win) },
+  });
+  // Zen's toast buttons are icon-only (see the window script's CSS for the
+  // icon) and built synchronously, so label this one for tooltips and
+  // screen readers now.
+  const button = win.document.getElementById(SUMMARY_BUTTON_ID);
+  button.setAttribute("tooltiptext", "Open Archived Tabs");
+  button.setAttribute("aria-label", "Open Archived Tabs");
+}
+
+// Opens the Library on Archived Tabs. toggle() closes the Library if it's
+// already showing that section, so leave it alone in that case.
+function openArchive(win) {
+  const Library = win.customElements.get("zen-library");
+  const showing = Library.isLibraryOpen && win.document.querySelector("zen-library").activeTab === SECTION_ID;
+  if (!showing) Library.toggle(SECTION_ID);
 }
 
 export function stop() {

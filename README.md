@@ -12,6 +12,7 @@ Tabs you haven't looked at for a while are moved out of your tab strip into an a
 - **Multi-select and bulk actions.** Select several tabs and restore or forget them in one go. Bulk restores happen in the background, without switching workspace.
 - **Keyboard navigation** throughout the Archived Tabs section (see below).
 - **Automatic clean-up.** Archived tabs are deleted after 30 days by default, and each one shows how long it has left.
+- **A brief summary on startup.** If tabs were archived since you last started Zen, a small Zen toast says how many, with a button to view them. Nothing is shown if nothing was archived.
 
 ## Requirements
 
@@ -36,6 +37,7 @@ These appear on the mod's page in Zen's settings:
 | Delete archived tabs after this many days | 30 | `0` keeps them forever |
 | Re-scan every this many minutes | 5 | Takes effect after a restart |
 | Never archive a tab that's currently playing audio | On | |
+| Show a short summary when Zen starts if tabs were archived | On | |
 
 Pinned tabs, Essentials and the active tab can also be made archivable in `about:config` (`uc.zen-tab-archive.skip-pinned`, `skip-essentials` and `skip-active`; all default to `true`).
 

@@ -22,6 +22,9 @@ export function makeServices({ prefs = {}, window = null } = {}) {
       getStringPref(name, fallback) {
         return name in this.values ? this.values[name] : fallback;
       },
+      setStringPref(name, value) {
+        this.values[name] = value;
+      },
     },
     obs: {
       addObserver(observer, topic) {
@@ -127,8 +130,40 @@ export function makeTab({
   };
 }
 
+// A bare element: just enough DOM for attribute assertions.
+function makeElement(id) {
+  const attributes = {};
+  return {
+    id,
+    attributes,
+    setAttribute: (n, v) => {
+      attributes[n] = v;
+    },
+    getAttribute: (n) => attributes[n] ?? null,
+  };
+}
+
 export function makeWindow({ tabs = [], allStoredTabs = tabs, activeWorkspace = "ws-a" } = {}) {
+  const elements = new Map();
+  const library = { activeTab: "history" };
+  const Library = { isLibraryOpen: false, toggles: [], toggle: (id) => Library.toggles.push(id) };
   const win = {
+    document: {
+      getElementById: (id) => elements.get(id) ?? null,
+      querySelector: (sel) => (sel === "zen-library" ? library : null),
+    },
+    customElements: { get: (name) => (name === "zen-library" ? Library : undefined) },
+    library,
+    Library,
+    gZenUIManager: {
+      toasts: [],
+      // Like Zen's, builds the toast (and its button) synchronously.
+      showToast(messageId, options) {
+        this.toasts.push({ messageId, options });
+        if (options.button) elements.set(options.button.id, makeElement(options.button.id));
+        return Promise.resolve();
+      },
+    },
     intervals: [],
     clearedIntervals: [],
     setInterval(fn, ms) {

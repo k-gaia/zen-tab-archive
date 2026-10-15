@@ -105,6 +105,30 @@ const CHECKS = {
         return (added.length === 3 && loaded.every((x) => x === "ok")) || JSON.stringify({ added: added.length, loaded });`,
     },
     {
+      name: "startup summary shows a toast with a View button that opens the Library",
+      script: `const a = ChromeUtils.importESModule("chrome://sine/content/zen-tab-archive/src/archiver.sys.mjs");
+        const s = ChromeUtils.importESModule("chrome://sine/content/zen-tab-archive/src/archiveStore.sys.mjs");
+        const Library = customElements.get("zen-library");
+        if (typeof Library?.toggle !== "function") return "zen-library has no static toggle()";
+        const id = "ci-summary-" + Date.now();
+        await s.appendTab({ id, workspaceId: gZenWorkspaces.activeWorkspace, url: "about:blank", title: "ci",
+          favicon: null, archivedAt: Date.now(), lastAccessedAt: 0, tabState: {} });
+        Services.prefs.setStringPref("uc.zen-tab-archive.last-startup", String(Date.now() - 60000));
+        await a.start();
+        await s.removeTab(id);
+        const button = document.getElementById(a.SUMMARY_BUTTON_ID);
+        const label = button?.closest(".zen-toast")?.querySelector("label");
+        let text = "";
+        for (let i = 0; i < 30 && !text; i++) {
+          text = (label?.textContent || label?.getAttribute("value") || "").trim();
+          if (!text) await new Promise((r) => setTimeout(r, 100));
+        }
+        const textOk = /^Archived 1 idle tab since last time$/.test(text);
+        button?.doCommand();
+        const opened = document.querySelector("zen-library").activeTab === "archived-tabs";
+        return (!!button && textOk && opened) || JSON.stringify({ button: !!button, text, opened });`,
+    },
+    {
       name: "retention prune removes only expired records",
       script: `const s = ChromeUtils.importESModule("chrome://sine/content/zen-tab-archive/src/archiveStore.sys.mjs");
         const base = { workspaceId: "ci-probe", url: "about:blank", title: "ci", favicon: null, lastAccessedAt: 0, tabState: {} };

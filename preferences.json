@@ -24,5 +24,10 @@
     "type": "checkbox",
     "label": "Never archive a tab that's currently playing audio",
     "property": "uc.zen-tab-archive.skip-audible"
+  },
+  {
+    "type": "checkbox",
+    "label": "Show a short summary when Zen starts if tabs were archived",
+    "property": "uc.zen-tab-archive.startup-summary"
   }
 ]

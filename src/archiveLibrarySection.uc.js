@@ -201,6 +201,14 @@
         animation: zen-tab-archive-icon-pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
       }
     }
+    /* The startup summary toast's "View" button (Zen's toast buttons are
+       icon-only; their icon is set by id, as Zen does for its own). */
+    #zen-tab-archive-summary-view {
+      list-style-image: url("chrome://sine/content/zen-tab-archive/src/icons/archived-tabs.svg");
+      -moz-context-properties: fill, stroke;
+      fill: transparent;
+      stroke: currentColor;
+    }
     @keyframes zen-tab-archive-icon-pop {
       from { transform: scale(0.75); }
       60% { transform: scale(1.12); }
